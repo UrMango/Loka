@@ -31,6 +31,8 @@ import {
   addRideToTrip,
   addAttractionToTrip,
   searchFlightByNumber,
+  searchFlightsByRoute,
+  searchAirports,
   hotelAutocomplete,
   hotelDetails,
   rideDistance,
@@ -39,10 +41,16 @@ import {
 } from '../services/api'
 
 export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, onUpdated: (t: Trip)=>void, onDone?: ()=>void }) {
-  const [mode, setMode] = useState<'search' | 'manual'>('search')
+  const [mode, setMode] = useState<'search' | 'route' | 'manual'>('search')
   const [flightNumber, setFlightNumber] = useState('')
   const [date, setDate] = useState('')
   const [flightData, setFlightData] = useState<any | null>(null)
+  
+  // Route search fields
+  const [origin, setOrigin] = useState<any | null>(null)
+  const [destination, setDestination] = useState<any | null>(null)
+  const [routeFlights, setRouteFlights] = useState<any[]>([])
+  const [selectedFlight, setSelectedFlight] = useState<any | null>(null)
   
   // Manual entry fields
   const [airline, setAirline] = useState('')
@@ -74,13 +82,25 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
     } finally { setSearching(false) }
   }
 
+  async function searchRoute() {
+    if (!origin?.code || !destination?.code || !date) return
+    setErr(null); setSearching(true); setRouteFlights([]); setSelectedFlight(null)
+    try {
+      const data = await searchFlightsByRoute(origin.code, destination.code, date)
+      setRouteFlights(data.flights || [])
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || e.message)
+      setRouteFlights([])
+    } finally { setSearching(false) }
+  }
+
   async function saveFlight() {
     setErr(null); setBusy(true)
     try {
       let segment: any
       
       if (mode === 'search' && flightData) {
-        // Save from API search
+        // Save from API search by flight number
         segment = {
           airline: flightData.airline,
           flightNumber: flightData.flightNumber || flightNumber.trim(),
@@ -92,6 +112,28 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
           aircraftType: flightData.aircraftType,
           terminal: flightData.terminal,
           gate: flightData.gate,
+          cost: cost ? Number(cost) : undefined,
+          carryOn,
+          checkedBag: checked,
+          bookingNumber: bookingNumber || undefined,
+          bookingAgency: bookingAgency || undefined,
+        }
+      } else if (mode === 'route' && selectedFlight) {
+        // Save from route search - transform nested structure to flat
+        segment = {
+          airline: selectedFlight.airline,
+          flightNumber: selectedFlight.flightNumber,
+          departureAirportCode: selectedFlight.departure?.iata || selectedFlight.departureAirportCode,
+          arrivalAirportCode: selectedFlight.arrival?.iata || selectedFlight.arrivalAirportCode,
+          departureDateTime: selectedFlight.departure?.scheduled || selectedFlight.departureDateTime,
+          arrivalDateTime: selectedFlight.arrival?.scheduled || selectedFlight.arrivalDateTime,
+          durationMinutes: selectedFlight.durationMinutes,
+          aircraftType: selectedFlight.aircraft || selectedFlight.aircraftType,
+          terminal: {
+            departure: selectedFlight.departure?.terminal,
+            arrival: selectedFlight.arrival?.terminal
+          },
+          gate: selectedFlight.gate,
           cost: cost ? Number(cost) : undefined,
           carryOn,
           checkedBag: checked,
@@ -123,6 +165,7 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
       
       // Reset form
       setFlightNumber(''); setDate(''); setFlightData(null)
+      setOrigin(null); setDestination(null); setRouteFlights([]); setSelectedFlight(null)
       setAirline(''); setDepartureAirport(''); setArrivalAirport('')
       setDepartureTime(''); setArrivalTime('')
       setCost(''); setCarryOn(false); setChecked(false); setBookingNumber(''); setBookingAgency('')
@@ -141,11 +184,12 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
       <Card sx={{ mb: 3 }}>
         <Tabs
           value={mode}
-          onChange={(_, v) => { setMode(v); setFlightData(null); setErr(null) }}
+          onChange={(_, v) => { setMode(v); setFlightData(null); setRouteFlights([]); setSelectedFlight(null); setErr(null) }}
           variant="fullWidth"
         >
-          <Tab value="search" label="Search by Flight Number" />
-          <Tab value="manual" label="Add Manually" />
+          <Tab value="search" label="By Flight Number" />
+          <Tab value="route" label="By Route" />
+          <Tab value="manual" label="Manual Entry" />
         </Tabs>
       </Card>
 
@@ -200,6 +244,127 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
               </Stack>
             </CardContent>
           </Card>
+        </>
+      )}
+
+      {/* Route Search Mode */}
+      {mode === 'route' && (
+        <>
+          <Card variant="outlined" sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                Search Flights by Route
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <SearchAutocomplete
+                    label="Origin Airport"
+                    placeholder="e.g. TLV, JFK, LHR"
+                    minChars={2}
+                    value={origin}
+                    fetchOptions={async (q: string) => {
+                      const result = await searchAirports(q)
+                      return result.airports || []
+                    }}
+                    getOptionLabel={(airport: any) => `${airport.code} - ${airport.name}`}
+                    onSelect={(airport: any) => setOrigin(airport)}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <SearchAutocomplete
+                    label="Destination Airport"
+                    placeholder="e.g. DXB, LAX, CDG"
+                    minChars={2}
+                    value={destination}
+                    fetchOptions={async (q: string) => {
+                      const result = await searchAirports(q)
+                      return result.airports || []
+                    }}
+                    getOptionLabel={(airport: any) => `${airport.code} - ${airport.name}`}
+                    onSelect={(airport: any) => setDestination(airport)}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Flight Date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    required
+                  />
+                </Grid>
+              </Grid>
+              <Button
+                variant="contained"
+                disabled={!origin?.code || !destination?.code || !date || searching}
+                onClick={searchRoute}
+                endIcon={searching && <CircularProgress size={20} />}
+                sx={{ mt: 2 }}
+              >
+                {searching ? 'Searching…' : 'Search Flights'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Flight List Results */}
+          {routeFlights.length > 0 && (
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                  Available Flights ({routeFlights.length})
+                </Typography>
+                <Stack spacing={2}>
+                  {routeFlights.map((flight, idx) => (
+                    <Paper
+                      key={idx}
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        cursor: 'pointer',
+                        border: selectedFlight === flight ? 2 : 1,
+                        borderColor: selectedFlight === flight ? 'primary.main' : 'divider',
+                        bgcolor: selectedFlight === flight ? 'primary.50' : 'background.paper',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => setSelectedFlight(flight)}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {flight.airline} - {flight.flightNumber}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {flight.departureAirportCode} → {flight.arrivalAirportCode}
+                          </Typography>
+                        </Box>
+                        <Box textAlign="right">
+                          <Typography variant="body2">
+                            {new Date(flight.departureDateTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - {new Date(flight.arrivalDateTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </Typography>
+                          {flight.durationMinutes && (
+                            <Typography variant="caption" color="text.secondary">
+                              {Math.floor(flight.durationMinutes / 60)}h {flight.durationMinutes % 60}m
+                            </Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                      {flight.aircraftType && (
+                        <Chip label={flight.aircraftType} size="small" sx={{ mt: 1 }} />
+                      )}
+                    </Paper>
+                  ))}
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
+
+          {routeFlights.length === 0 && !searching && date && origin && destination && (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              No flights found for this route. Try searching by flight number or add manually.
+            </Alert>
+          )}
         </>
       )}
 
@@ -288,7 +453,7 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
       )}
 
       {/* Flight Details (shown after search) */}
-      {flightData && (
+      {(flightData || selectedFlight) && (
         <>
           <Card variant="outlined" sx={{ mb: 3, bgcolor: 'primary.50' }}>
             <CardContent>
@@ -299,9 +464,9 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
               <Grid container spacing={2}>
                 <Grid item xs={12}>
                   <Box display="flex" alignItems="center" gap={1}>
-                    <Chip label={flightData.airline} color="primary" />
+                    <Chip label={(flightData || selectedFlight).airline} color="primary" />
                     <Typography variant="h6" fontWeight="bold">
-                      {flightData.flightNumber}
+                      {(flightData || selectedFlight).flightNumber}
                     </Typography>
                   </Box>
                 </Grid>
@@ -310,19 +475,19 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
                   <Paper sx={{ p: 2 }}>
                     <Typography variant="caption" color="text.secondary">Departure</Typography>
                     <Typography variant="h6" fontWeight="bold">
-                      {flightData.departureAirportCode}
+                      {(flightData || selectedFlight).departureAirportCode || (flightData || selectedFlight).departure?.iata}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {new Date(flightData.departureDateTime).toLocaleString()}
+                      {new Date((flightData || selectedFlight).departureDateTime || (flightData || selectedFlight).departure?.scheduled).toLocaleString()}
                     </Typography>
-                    {flightData.terminal?.departure && (
+                    {((flightData || selectedFlight).terminal?.departure || (flightData || selectedFlight).departure?.terminal) && (
                       <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                        Terminal: {flightData.terminal.departure}
+                        Terminal: {(flightData || selectedFlight).terminal?.departure || (flightData || selectedFlight).departure?.terminal}
                       </Typography>
                     )}
-                    {flightData.gate?.departure && (
+                    {((flightData || selectedFlight).gate?.departure || (flightData || selectedFlight).departure?.gate) && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        Gate: {flightData.gate.departure}
+                        Gate: {(flightData || selectedFlight).gate?.departure || (flightData || selectedFlight).departure?.gate}
                       </Typography>
                     )}
                   </Paper>
@@ -332,34 +497,34 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
                   <Paper sx={{ p: 2 }}>
                     <Typography variant="caption" color="text.secondary">Arrival</Typography>
                     <Typography variant="h6" fontWeight="bold">
-                      {flightData.arrivalAirportCode}
+                      {(flightData || selectedFlight).arrivalAirportCode || (flightData || selectedFlight).arrival?.iata}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {new Date(flightData.arrivalDateTime).toLocaleString()}
+                      {new Date((flightData || selectedFlight).arrivalDateTime || (flightData || selectedFlight).arrival?.scheduled).toLocaleString()}
                     </Typography>
-                    {flightData.terminal?.arrival && (
+                    {((flightData || selectedFlight).terminal?.arrival || (flightData || selectedFlight).arrival?.terminal) && (
                       <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                        Terminal: {flightData.terminal.arrival}
+                        Terminal: {(flightData || selectedFlight).terminal?.arrival || (flightData || selectedFlight).arrival?.terminal}
                       </Typography>
                     )}
-                    {flightData.gate?.arrival && (
+                    {((flightData || selectedFlight).gate?.arrival || (flightData || selectedFlight).arrival?.gate) && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        Gate: {flightData.gate.arrival}
+                        Gate: {(flightData || selectedFlight).gate?.arrival || (flightData || selectedFlight).arrival?.gate}
                       </Typography>
                     )}
                   </Paper>
                 </Grid>
 
-                {flightData.durationMinutes && (
+                {(flightData || selectedFlight).durationMinutes && (
                   <Grid item xs={12}>
                     <Alert severity="info" icon={false}>
                       <Stack direction="row" spacing={2} alignItems="center">
                         <Typography variant="body2">
-                          <strong>Duration:</strong> {Math.floor(flightData.durationMinutes / 60)}h {flightData.durationMinutes % 60}m
+                          <strong>Duration:</strong> {Math.floor((flightData || selectedFlight).durationMinutes / 60)}h {(flightData || selectedFlight).durationMinutes % 60}m
                         </Typography>
-                        {flightData.aircraftType && (
+                        {((flightData || selectedFlight).aircraftType || (flightData || selectedFlight).aircraft) && (
                           <Typography variant="body2">
-                            <strong>Aircraft:</strong> {flightData.aircraftType}
+                            <strong>Aircraft:</strong> {(flightData || selectedFlight).aircraftType || (flightData || selectedFlight).aircraft}
                           </Typography>
                         )}
                       </Stack>
@@ -485,7 +650,7 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
       )}
 
       {/* Save Button */}
-      {((mode === 'search' && flightData) || (mode === 'manual' && flightNumber && date && departureAirport && arrivalAirport)) && (
+      {((mode === 'search' && flightData) || (mode === 'route' && selectedFlight) || (mode === 'manual' && flightNumber && date && departureAirport && arrivalAirport)) && (
         <Button
           variant="contained"
           size="large"

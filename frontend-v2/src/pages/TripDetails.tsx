@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { getTrip } from '../services/api'
+import { getTrip, GOOGLE_MAPS_API_KEY } from '../services/api'
 import type { Trip } from '../types/domain'
 import { groupTripByDay } from '../types/domain'
 import { AddFlightForm, AddHotelForm, AddRideForm, AddAttractionForm } from '../components/AddItemForms'
+import { GoogleMap, LoadScript, Marker, InfoWindow, Polyline, DirectionsService, DirectionsRenderer } from '@react-google-maps/api'
 import {
   Box,
   Typography,
@@ -44,6 +45,197 @@ import {
 
 type FilterCategory = 'all' | 'flights' | 'hotels' | 'rides' | 'attractions'
 type ViewMode = 'list' | 'timeline' | 'map'
+
+// Small embedded map component for ride routes
+function RideMapEmbed({ ride }: { ride: any }) {
+  const [directions, setDirections] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  const mapContainerStyle = {
+    width: '100%',
+    height: '250px',
+    borderRadius: '8px'
+  }
+
+  const directionsCallback = (result: any, status: any) => {
+    if (status === 'OK' && result) {
+      setDirections(result)
+      setError(null)
+    } else {
+      setError(`Unable to calculate route: ${status}`)
+    }
+  }
+
+  const onLoad = () => {
+    setIsLoaded(true)
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    return (
+      <Alert severity="warning" sx={{ mt: 2 }}>
+        Google Maps API key is not configured.
+      </Alert>
+    )
+  }
+
+  return (
+    <Box sx={{ mt: 2 }}>
+      <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} onLoad={onLoad}>
+        <GoogleMap
+          mapContainerStyle={mapContainerStyle}
+          center={{ lat: 0, lng: 0 }}
+          zoom={13}
+        >
+          {isLoaded && !directions && ride.pickup && ride.dropoff && (
+            <DirectionsService
+              options={{
+                origin: ride.pickup,
+                destination: ride.dropoff,
+                travelMode: window.google?.maps?.TravelMode?.DRIVING || 'DRIVING' as any,
+              }}
+              callback={directionsCallback}
+            />
+          )}
+          {directions && (
+            <DirectionsRenderer
+              options={{
+                directions: directions,
+              }}
+            />
+          )}
+        </GoogleMap>
+      </LoadScript>
+      
+      {error && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {directions && (
+        <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+          <Chip 
+            size="small" 
+            label={`Distance: ${directions.routes[0]?.legs[0]?.distance?.text}`}
+            variant="outlined"
+          />
+          <Chip 
+            size="small" 
+            label={`Duration: ${directions.routes[0]?.legs[0]?.duration?.text}`}
+            variant="outlined"
+          />
+        </Stack>
+      )}
+    </Box>
+  )
+}
+
+// Map component to display trip locations
+function TripMapView({ trip }: { trip: Trip }) {
+  const [selectedMarker, setSelectedMarker] = useState<any>(null)
+  const [mapCenter, setMapCenter] = useState({ lat: 0, lng: 0 })
+  const [mapZoom, setMapZoom] = useState(4)
+
+  useEffect(() => {
+    // Calculate center based on hotels and attractions
+    const locations: { lat: number; lng: number }[] = []
+    
+    // For now, we'll use a default center
+    // In a real implementation, you'd geocode hotel addresses
+    if (trip.hotels.length > 0 || trip.attractions.length > 0) {
+      // Default to a world view, or you could geocode the destinations
+      setMapCenter({ lat: 20, lng: 0 })
+      setMapZoom(2)
+    }
+  }, [trip])
+
+  const mapContainerStyle = {
+    width: '100%',
+    height: '600px'
+  }
+
+  // Collect all markers
+  const markers: Array<{ id: string; position: { lat: number; lng: number }; type: string; data: any }> = []
+  
+  // Note: Hotels and attractions need geocoding to show on map
+  // This is a placeholder implementation
+
+  return (
+    <Card>
+      <CardContent>
+        {!GOOGLE_MAPS_API_KEY ? (
+          <Alert severity="warning">
+            Google Maps API key is not configured. Please add VITE_GOOGLE_MAPS_API_KEY to your .env file.
+          </Alert>
+        ) : (
+          <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              center={mapCenter}
+              zoom={mapZoom}
+            >
+              {markers.map((marker) => (
+                <Marker
+                  key={marker.id}
+                  position={marker.position}
+                  onClick={() => setSelectedMarker(marker)}
+                />
+              ))}
+              
+              {selectedMarker && (
+                <InfoWindow
+                  position={selectedMarker.position}
+                  onCloseClick={() => setSelectedMarker(null)}
+                >
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      {selectedMarker.data.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {selectedMarker.type}
+                    </Typography>
+                  </Box>
+                </InfoWindow>
+              )}
+            </GoogleMap>
+          </LoadScript>
+        )}
+        
+        <Alert severity="info" sx={{ mt: 2 }}>
+          <Typography variant="body2" fontWeight="bold" gutterBottom>
+            Map Integration Status
+          </Typography>
+          <Typography variant="caption" display="block">
+            ✅ Google Maps API configured ({GOOGLE_MAPS_API_KEY ? 'Key found' : 'Key missing'})
+          </Typography>
+          <Typography variant="caption" display="block">
+            ⚠️ Hotel and attraction locations need geocoding to display on the map
+          </Typography>
+          <Typography variant="caption" display="block">
+            📍 To show locations, addresses need to be converted to latitude/longitude coordinates
+          </Typography>
+        </Alert>
+        
+        <Box mt={2}>
+          <Typography variant="subtitle2" gutterBottom>Your Trip Data:</Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            • {trip.hotels.length} hotels
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            • {trip.attractions.length} attractions
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            • {trip.flights.length} flights
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            • {trip.rides.length} rides
+          </Typography>
+        </Box>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function TripDetails() {
   const { id } = useParams<{ id: string }>()
@@ -649,6 +841,7 @@ export default function TripDetails() {
                                   Mode: {r.mode}
                                 </Typography>
                               )}
+                              <RideMapEmbed ride={r} />
                             </Box>
                           </Collapse>
                         </Paper>
@@ -1032,6 +1225,7 @@ export default function TripDetails() {
                                           </Typography>
                                         </>
                                       )}
+                                      <RideMapEmbed ride={item.data} />
                                     </>
                                   )}
                                   
@@ -1074,21 +1268,7 @@ export default function TripDetails() {
 
       {/* MAP VIEW */}
       {viewMode === 'map' && (
-        <Card>
-          <CardContent>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Map view coming soon! This will show all your trip locations on an interactive map.
-            </Alert>
-            <Typography variant="body2" color="text.secondary">
-              Future features:
-            </Typography>
-            <ul>
-              <li><Typography variant="body2" color="text.secondary">Interactive map with all locations</Typography></li>
-              <li><Typography variant="body2" color="text.secondary">Click on markers to see activity details</Typography></li>
-              <li><Typography variant="body2" color="text.secondary">Flight paths, routes, and hotel locations</Typography></li>
-            </ul>
-          </CardContent>
-        </Card>
+        <TripMapView trip={trip} />
       )}
     </Box>
   )
