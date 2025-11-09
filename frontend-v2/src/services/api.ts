@@ -1,7 +1,11 @@
 import axios from 'axios'
 import type { Trip, FlightSegment, HotelBooking, RideLeg, AttractionVisit } from '../types/domain'
 
-export const api = axios.create({ baseURL: '/api' })
+// Use proxy in development (/api), direct URL in production
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
+export const api = axios.create({ baseURL })
+
+export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 
 export async function listTrips(): Promise<Trip[]> {
   const res = await api.get<Trip[]>('/trips')

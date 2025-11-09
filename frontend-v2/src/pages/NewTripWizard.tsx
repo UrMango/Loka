@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createTrip } from '../services/api'
 import type { Trip } from '../types/domain'
 import { useNavigate, Link } from 'react-router-dom'
@@ -42,6 +42,14 @@ export default function NewTripWizard() {
   const [creating, setCreating] = useState(false)
   const [trip, setTrip] = useState<Trip | null>(null)
   const navigate = useNavigate()
+
+  // Reset wizard when component mounts (new trip creation)
+  useEffect(() => {
+    setStep(0)
+    setBasic({ name: '', destinations: '', startDate: '', endDate: '' })
+    setTrip(null)
+    setCreating(false)
+  }, [])
 
   const next = () => setStep(s => Math.min(s+1, steps.length-1))
   const prev = () => setStep(s => Math.max(s-1, 0))
@@ -184,7 +192,7 @@ export default function NewTripWizard() {
         <StepCard title="Add Flights" subtitle={trip ? `Trip: ${trip.name}` : 'Create the trip first to add items.'}>
           {trip ? (
             <div className="space-y-4">
-              <AddFlightForm tripId={trip.id} onUpdated={setTrip} />
+              <AddFlightForm key={`flight-${trip.id}`} tripId={trip.id} onUpdated={setTrip} />
               {trip.flights.length>0 && (
                 <div>
                   <div className="text-sm font-medium mb-1">Flights added</div>
@@ -208,7 +216,7 @@ export default function NewTripWizard() {
         <StepCard title="Add Hotels" subtitle={trip ? `Trip: ${trip.name}` : 'Create the trip first to add items.'}>
           {trip ? (
             <div className="space-y-4">
-              <AddHotelForm tripId={trip.id} onUpdated={setTrip} />
+              <AddHotelForm key={`hotel-${trip.id}`} tripId={trip.id} onUpdated={setTrip} />
               {trip.hotels.length>0 && (
                 <div>
                   <div className="text-sm font-medium mb-1">Hotels added</div>
@@ -232,7 +240,7 @@ export default function NewTripWizard() {
         <StepCard title="Add Rides" subtitle={trip ? `Trip: ${trip.name}` : 'Create the trip first to add items.'}>
           {trip ? (
             <div className="space-y-4">
-              <AddRideForm tripId={trip.id} onUpdated={setTrip} />
+              <AddRideForm key={`ride-${trip.id}`} tripId={trip.id} onUpdated={setTrip} />
               {trip.rides.length>0 && (
                 <div>
                   <div className="text-sm font-medium mb-1">Rides added</div>
@@ -256,7 +264,7 @@ export default function NewTripWizard() {
         <StepCard title="Add Attractions" subtitle={trip ? `Trip: ${trip.name}` : 'Create the trip first to add items.'}>
           {trip ? (
             <div className="space-y-4">
-              <AddAttractionForm tripId={trip.id} onUpdated={setTrip} />
+              <AddAttractionForm key={`attraction-${trip.id}`} tripId={trip.id} onUpdated={setTrip} />
               {trip.attractions.length>0 && (
                 <div>
                   <div className="text-sm font-medium mb-1">Attractions added</div>

@@ -3,13 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "workspaces": ["backend", "frontend-v2"],
+  "workspaces": [
+    "backend",
+    "frontend-v2"
+  ],
   "scripts": {
     "dev": "npm --workspace frontend-v2 run dev",
     "build": "npm --workspace frontend-v2 run build",
     "preview": "npm --workspace frontend-v2 run preview",
     "backend": "npm --workspace backend start"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "@react-google-maps/api": "^2.20.7"
+  }
 }

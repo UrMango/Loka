@@ -21,7 +21,9 @@ import {
   Tabs,
   Tab,
   Paper,
-  Divider
+  Divider,
+  Collapse,
+  CardActionArea
 } from '@mui/material'
 import {
   ArrowBack,
@@ -33,16 +35,23 @@ import {
   CalendarMonth,
   Close,
   AccessTime,
-  AttachMoney
+  ViewList,
+  Timeline as TimelineIcon,
+  Map as MapIcon,
+  ExpandMore,
+  ExpandLess
 } from '@mui/icons-material'
 
 type FilterCategory = 'all' | 'flights' | 'hotels' | 'rides' | 'attractions'
+type ViewMode = 'list' | 'timeline' | 'map'
 
 export default function TripDetails() {
   const { id } = useParams<{ id: string }>()
   const [trip, setTrip] = useState<Trip | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterCategory>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [expandedItem, setExpandedItem] = useState<{ type: string; index: number } | null>(null)
 
   useEffect(() => {
     if (id) getTrip(id).then(setTrip).catch(e => setError(e.message))
@@ -64,19 +73,15 @@ export default function TripDetails() {
     return filter === 'all' || filter === category
   }
 
-  // Filter days to only show days with items in the selected category
+  // Filter days to show filtered items for each category
+  // Keep all days in the range, even if empty
   const filteredBuckets = buckets.map(day => ({
     ...day,
     flights: shouldShowCategory('flights') ? day.flights : [],
     hotels: shouldShowCategory('hotels') ? day.hotels : [],
     rides: shouldShowCategory('rides') ? day.rides : [],
     attractions: shouldShowCategory('attractions') ? day.attractions : []
-  })).filter(day => 
-    day.flights.length > 0 || 
-    day.hotels.length > 0 || 
-    day.rides.length > 0 || 
-    day.attractions.length > 0
-  )
+  }))
 
   return (
     <Box>
@@ -166,34 +171,90 @@ export default function TripDetails() {
       </Paper>
 
       {/* Action Bar */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <AddItemModalLauncher trip={trip} onUpdated={setTrip} />
         
-        {totalCost > 0 && (
-          <Paper 
-            elevation={0}
-            sx={{ 
-              px: 3, 
-              py: 1.5, 
-              bgcolor: 'success.lighter',
-              border: '2px solid',
-              borderColor: 'success.main',
-              borderRadius: 2
-            }}
-          >
-            <Stack direction="row" spacing={2} alignItems="center">
-              <AttachMoney sx={{ color: 'success.main' }} />
-              <Box>
-                <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                  Total Budget
-                </Typography>
-                <Typography variant="h5" fontWeight={700} color="success.main">
-                  ${totalCost.toFixed(2)}
-                </Typography>
-              </Box>
+        <Stack direction="row" spacing={2} alignItems="center">
+          {/* View Mode Toggle */}
+          <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+            <Stack direction="row">
+              <Button
+                size="small"
+                startIcon={<ViewList />}
+                onClick={() => setViewMode('list')}
+                sx={{
+                  borderRadius: 0,
+                  borderRight: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: viewMode === 'list' ? 'primary.main' : 'transparent',
+                  color: viewMode === 'list' ? 'white' : 'text.primary',
+                  '&:hover': {
+                    bgcolor: viewMode === 'list' ? 'primary.dark' : 'action.hover'
+                  }
+                }}
+              >
+                List
+              </Button>
+              <Button
+                size="small"
+                startIcon={<TimelineIcon />}
+                onClick={() => setViewMode('timeline')}
+                sx={{
+                  borderRadius: 0,
+                  borderRight: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: viewMode === 'timeline' ? 'primary.main' : 'transparent',
+                  color: viewMode === 'timeline' ? 'white' : 'text.primary',
+                  '&:hover': {
+                    bgcolor: viewMode === 'timeline' ? 'primary.dark' : 'action.hover'
+                  }
+                }}
+              >
+                Timeline
+              </Button>
+              <Button
+                size="small"
+                startIcon={<MapIcon />}
+                onClick={() => setViewMode('map')}
+                sx={{
+                  borderRadius: 0,
+                  bgcolor: viewMode === 'map' ? 'primary.main' : 'transparent',
+                  color: viewMode === 'map' ? 'white' : 'text.primary',
+                  '&:hover': {
+                    bgcolor: viewMode === 'map' ? 'primary.dark' : 'action.hover'
+                  }
+                }}
+              >
+                Map
+              </Button>
             </Stack>
           </Paper>
-        )}
+
+          {totalCost > 0 && (
+            <Paper 
+              elevation={0}
+              sx={{ 
+                px: 3, 
+                py: 1.5, 
+                bgcolor: 'success.lighter',
+                border: '2px solid',
+                borderColor: 'success.main',
+                borderRadius: 2
+              }}
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                    Total Budget
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} color="success.main">
+                    ${totalCost.toFixed(2)}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+          )}
+        </Stack>
       </Stack>
 
       {/* Filter Bar */}
@@ -242,38 +303,87 @@ export default function TripDetails() {
         </Tabs>
       </Card>
 
-      <Stack spacing={2}>
-        {filteredBuckets.length === 0 && (
+      {/* LIST VIEW */}
+      {viewMode === 'list' && (
+        <Stack spacing={2}>
+          {/* Show message if filtering and no items of that type exist */}
+          {filter !== 'all' && 
+          trip.flights.length === 0 && filter === 'flights' && (
           <Card>
             <CardContent>
               <Box display="flex" flexDirection="column" alignItems="center" py={6}>
-                {filter === 'flights' && <FlightIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />}
-                {filter === 'hotels' && <HotelIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />}
-                {filter === 'rides' && <DirectionsCar sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />}
-                {filter === 'attractions' && <AttractionsOutlined sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />}
-                {filter === 'all' && <CalendarMonth sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />}
-                
+                <FlightIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
                 <Typography variant="h6" color="text.secondary" gutterBottom>
-                  No {filter === 'all' ? 'items' : filter} found
+                  No flights found
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {filter === 'all' 
-                    ? 'Start adding items to your trip using the button above.'
-                    : `No ${filter} have been added to this trip yet.`
-                  }
+                  No flights have been added to this trip yet.
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
+        {filter !== 'all' && 
+          trip.hotels.length === 0 && filter === 'hotels' && (
+          <Card>
+            <CardContent>
+              <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+                <HotelIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No hotels found
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  No hotels have been added to this trip yet.
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
+        {filter !== 'all' && 
+          trip.rides.length === 0 && filter === 'rides' && (
+          <Card>
+            <CardContent>
+              <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+                <DirectionsCar sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No rides found
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  No rides have been added to this trip yet.
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
+        {filter !== 'all' && 
+          trip.attractions.length === 0 && filter === 'attractions' && (
+          <Card>
+            <CardContent>
+              <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+                <AttractionsOutlined sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No attractions found
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  No attractions have been added to this trip yet.
                 </Typography>
               </Box>
             </CardContent>
           </Card>
         )}
         
-        {filteredBuckets.map((day) => (
-          <Card key={day.date}>
-            <CardContent sx={{ bgcolor: 'grey.50', borderBottom: 1, borderColor: 'divider' }}>
-              <Typography variant="h6" fontWeight="bold">
-                {day.date}
-              </Typography>
-            </CardContent>
+        {filteredBuckets.map((day, index) => {
+          const dayNumber = index + 1;
+          const [year, month, dayOfMonth] = day.date.split('-');
+          const formattedDate = `${dayOfMonth}-${month}-${year}`;
+          
+          return (
+            <Card key={day.date}>
+              <CardContent sx={{ bgcolor: 'grey.50', borderBottom: 1, borderColor: 'divider' }}>
+                <Typography variant="h6" fontWeight="bold">
+                  DAY {dayNumber} - {formattedDate}
+                </Typography>
+              </CardContent>
             <CardContent>
               <Stack spacing={2}>
                 {day.flights.length > 0 && (
@@ -284,17 +394,92 @@ export default function TripDetails() {
                         Flights
                       </Typography>
                     </Stack>
-                    {day.flights.map((f, i) => (
-                      <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1 }}>
-                        <Typography variant="body2">
-                          <strong>{f.flightNumber}</strong> {f.departureAirportCode}→{f.arrivalAirportCode}
-                        </Typography>
-                        <Stack direction="row" spacing={2} mt={0.5}>
-                          <Chip icon={<AccessTime />} size="small" label={`${f.departureDateTime.slice(11, 16)} - ${f.arrivalDateTime.slice(11, 16)}`} />
-                          {f.cost && <Chip icon={<AttachMoney />} size="small" label={`$${f.cost}`} color="success" />}
-                        </Stack>
-                      </Paper>
-                    ))}
+                    {day.flights.map((f, i) => {
+                      const isExpanded = expandedItem?.type === 'flight' && expandedItem?.index === i;
+                      return (
+                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden' }}>
+                          <CardActionArea
+                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'flight', index: i })}
+                            sx={{ p: 1.5 }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Box>
+                                <Typography variant="body2">
+                                  <strong>{f.flightNumber}</strong> {f.departureAirportCode}→{f.arrivalAirportCode}
+                                </Typography>
+                                <Stack direction="row" spacing={2} mt={0.5}>
+                                  <Chip icon={<AccessTime />} size="small" label={`${f.departureDateTime.slice(11, 16)} - ${f.arrivalDateTime.slice(11, 16)}`} />
+                                  {f.cost && <Chip size="small" label={`$${f.cost}`} color="success" />}
+                                </Stack>
+                              </Box>
+                              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                            </Stack>
+                          </CardActionArea>
+                          <Collapse in={isExpanded}>
+                            <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: 1, borderColor: 'divider' }}>
+                              <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                <strong>Flight Details</strong>
+                              </Typography>
+                              {f.terminal?.departure && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Departure Terminal: {f.terminal.departure}
+                                </Typography>
+                              )}
+                              {f.gate?.departure && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Departure Gate: {f.gate.departure}
+                                </Typography>
+                              )}
+                              {f.terminal?.arrival && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Arrival Terminal: {f.terminal.arrival}
+                                </Typography>
+                              )}
+                              {f.gate?.arrival && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Arrival Gate: {f.gate.arrival}
+                                </Typography>
+                              )}
+                              {f.durationMinutes && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Duration: {Math.floor(f.durationMinutes / 60)}h {f.durationMinutes % 60}m
+                                </Typography>
+                              )}
+                              {f.aircraftType && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Aircraft: {f.aircraftType}
+                                </Typography>
+                              )}
+                              {(f.bookingNumber || f.bookingAgency || f.carryOn !== undefined || f.checkedBag !== undefined) && (
+                                <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                                  <strong>Booking Info</strong>
+                                </Typography>
+                              )}
+                              {f.bookingNumber && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Booking Number: {f.bookingNumber}
+                                </Typography>
+                              )}
+                              {f.bookingAgency && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Agency: {f.bookingAgency}
+                                </Typography>
+                              )}
+                              {f.carryOn !== undefined && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Carry-on: {f.carryOn ? 'Included' : 'Not included'}
+                                </Typography>
+                              )}
+                              {f.checkedBag !== undefined && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Checked Bag: {f.checkedBag ? 'Included' : 'Not included'}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Collapse>
+                        </Paper>
+                      );
+                    })}
                   </Box>
                 )}
                 {day.hotels.length > 0 && (
@@ -305,17 +490,67 @@ export default function TripDetails() {
                         Hotels
                       </Typography>
                     </Stack>
-                    {day.hotels.map((h, i) => (
-                      <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1 }}>
-                        <Typography variant="body2">
-                          <strong>{h.name}</strong>
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Check-in: {h.checkIn}
-                        </Typography>
-                        {h.cost && <Chip icon={<AttachMoney />} size="small" label={`$${h.cost}`} color="success" sx={{ mt: 0.5 }} />}
-                      </Paper>
-                    ))}
+                    {day.hotels.map((h, i) => {
+                      const isExpanded = expandedItem?.type === 'hotel' && expandedItem?.index === i;
+                      return (
+                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden' }}>
+                          <CardActionArea
+                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'hotel', index: i })}
+                            sx={{ p: 1.5 }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Box>
+                                <Typography variant="body2">
+                                  <strong>{h.name}</strong>
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Check-in: {h.checkIn}
+                                </Typography>
+                                {h.cost && <Chip size="small" label={`$${h.cost}`} color="success" sx={{ mt: 0.5 }} />}
+                              </Box>
+                              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                            </Stack>
+                          </CardActionArea>
+                          <Collapse in={isExpanded}>
+                            <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: 1, borderColor: 'divider' }}>
+                              <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                <strong>Hotel Details</strong>
+                              </Typography>
+                              {h.address && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Address: {h.address}
+                                </Typography>
+                              )}
+                              {h.checkOut && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Check-out: {h.checkOut}
+                                </Typography>
+                              )}
+                              {h.nights && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Nights: {h.nights}
+                                </Typography>
+                              )}
+                              {h.rating && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Rating: {h.rating} ⭐
+                                </Typography>
+                              )}
+                              {h.distanceFromAirport && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Distance from airport: {h.distanceFromAirport}
+                                </Typography>
+                              )}
+                              {h.travelTimeFromAirport && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Travel time from airport: {h.travelTimeFromAirport}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Collapse>
+                        </Paper>
+                      );
+                    })}
                   </Box>
                 )}
                 {day.rides.length > 0 && (
@@ -326,52 +561,99 @@ export default function TripDetails() {
                         Transportation
                       </Typography>
                     </Stack>
-                    {day.rides.map((r: any, i) => (
-                      <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1 }}>
-                        <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
-                          <Chip 
-                            label={r.type === 'rental' ? '🚗 Car Rental' : '🚕 Taxi/Ride'} 
-                            size="small" 
-                            color={r.type === 'rental' ? 'primary' : 'secondary'}
-                          />
-                          {r.time && <Chip icon={<AccessTime />} size="small" label={r.time} />}
-                        </Stack>
-                        <Typography variant="body2" fontWeight="medium">
-                          {r.pickup} → {r.dropoff}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {r.distance && `${r.distance} • `}{r.duration || ''}
-                        </Typography>
-                        
-                        {r.type === 'rental' && (
-                          <Box mt={1}>
-                            {r.rentalCompany && (
-                              <Typography variant="caption" color="text.secondary" display="block">
-                                Company: <strong>{r.rentalCompany}</strong>
-                              </Typography>
-                            )}
-                            {r.voucherNumber && (
-                              <Typography variant="caption" color="text.secondary" display="block">
-                                Voucher: {r.voucherNumber}
-                              </Typography>
-                            )}
-                            {r.returnDate && r.returnTime && (
-                              <Typography variant="caption" color="text.secondary" display="block">
-                                Return: {r.returnDate} at {r.returnTime}
-                              </Typography>
-                            )}
-                          </Box>
-                        )}
-                        
-                        {r.type === 'taxi' && r.notes && (
-                          <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                            Notes: {r.notes}
-                          </Typography>
-                        )}
-                        
-                        {r.cost && <Chip icon={<AttachMoney />} size="small" label={`$${r.cost}`} color="success" sx={{ mt: 1 }} />}
-                      </Paper>
-                    ))}
+                    {day.rides.map((r: any, i) => {
+                      const isExpanded = expandedItem?.type === 'ride' && expandedItem?.index === i;
+                      return (
+                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden' }}>
+                          <CardActionArea
+                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'ride', index: i })}
+                            sx={{ p: 1.5 }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                              <Box flex={1}>
+                                <Stack direction="row" spacing={1} alignItems="center" mb={0.5} flexWrap="wrap">
+                                  <Chip 
+                                    label={r.type === 'rental' ? '🚗 Car Rental' : '🚕 Taxi/Ride'} 
+                                    size="small" 
+                                    color={r.type === 'rental' ? 'primary' : 'secondary'}
+                                  />
+                                  {r.time && <Chip icon={<AccessTime />} size="small" label={r.time} />}
+                                  {r.cost && <Chip size="small" label={`$${r.cost}`} color="success" />}
+                                </Stack>
+                                <Typography variant="body2" fontWeight="medium">
+                                  {r.pickup} → {r.dropoff}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  {r.distance && `${r.distance} • `}{r.duration || ''}
+                                </Typography>
+                              </Box>
+                              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                            </Stack>
+                          </CardActionArea>
+                          <Collapse in={isExpanded}>
+                            <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: 1, borderColor: 'divider' }}>
+                              {r.type === 'rental' && (
+                                <>
+                                  <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                    <strong>Rental Details</strong>
+                                  </Typography>
+                                  {r.rentalCompany && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      Company: {r.rentalCompany}
+                                    </Typography>
+                                  )}
+                                  {r.voucherNumber && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      Voucher: {r.voucherNumber}
+                                    </Typography>
+                                  )}
+                                  {r.pickupDate && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      Pickup Date: {r.pickupDate}
+                                    </Typography>
+                                  )}
+                                  {r.pickupTime && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      Pickup Time: {r.pickupTime}
+                                    </Typography>
+                                  )}
+                                  {r.returnDate && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      Return Date: {r.returnDate}
+                                    </Typography>
+                                  )}
+                                  {r.returnTime && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      Return Time: {r.returnTime}
+                                    </Typography>
+                                  )}
+                                  {r.returnLocation && (
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      Return Location: {r.returnLocation}
+                                    </Typography>
+                                  )}
+                                </>
+                              )}
+                              {r.type === 'taxi' && r.notes && (
+                                <>
+                                  <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                    <strong>Additional Info</strong>
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" display="block">
+                                    Notes: {r.notes}
+                                  </Typography>
+                                </>
+                              )}
+                              {r.mode && (
+                                <Typography variant="caption" color="text.secondary" display="block" mt={r.type === 'rental' || r.notes ? 1 : 0}>
+                                  Mode: {r.mode}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Collapse>
+                        </Paper>
+                      );
+                    })}
                   </Box>
                 )}
                 {day.attractions.length > 0 && (
@@ -382,32 +664,432 @@ export default function TripDetails() {
                         Attractions
                       </Typography>
                     </Stack>
-                    {day.attractions.map((a, i) => (
-                      <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1 }}>
-                        <Typography variant="body2">
-                          <strong>{a.name}</strong>
-                        </Typography>
-                        {a.scheduledTime && (
-                          <Chip icon={<AccessTime />} size="small" label={a.scheduledTime} sx={{ mt: 0.5 }} />
-                        )}
-                        {a.cost && <Chip icon={<AttachMoney />} size="small" label={`$${a.cost}`} color="success" sx={{ mt: 0.5, ml: 1 }} />}
-                      </Paper>
-                    ))}
+                    {day.attractions.map((a, i) => {
+                      const isExpanded = expandedItem?.type === 'attraction' && expandedItem?.index === i;
+                      return (
+                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden' }}>
+                          <CardActionArea
+                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'attraction', index: i })}
+                            sx={{ p: 1.5 }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Box>
+                                <Typography variant="body2">
+                                  <strong>{a.name}</strong>
+                                </Typography>
+                                <Stack direction="row" spacing={1} mt={0.5} flexWrap="wrap">
+                                  {a.scheduledTime && (
+                                    <Chip icon={<AccessTime />} size="small" label={a.scheduledTime} />
+                                  )}
+                                  {a.cost && <Chip size="small" label={`$${a.cost}`} color="success" />}
+                                </Stack>
+                              </Box>
+                              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                            </Stack>
+                          </CardActionArea>
+                          <Collapse in={isExpanded}>
+                            <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: 1, borderColor: 'divider' }}>
+                              <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                <strong>Attraction Details</strong>
+                              </Typography>
+                              {a.address && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Address: {a.address}
+                                </Typography>
+                              )}
+                              {a.rating && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Rating: {a.rating} ⭐
+                                </Typography>
+                              )}
+                              {a.website && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Website: <a href={a.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{a.website}</a>
+                                </Typography>
+                              )}
+                              {a.scheduledDate && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Scheduled: {a.scheduledDate} {a.scheduledTime && `at ${a.scheduledTime}`}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Collapse>
+                        </Paper>
+                      );
+                    })}
                   </Box>
                 )}
                 {day.flights.length === 0 &&
                   day.hotels.length === 0 &&
                   day.rides.length === 0 &&
                   day.attractions.length === 0 && (
-                    <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                      No items for this day.
-                    </Typography>
+                    <Box sx={{ py: 2, textAlign: 'center' }}>
+                      <Typography variant="body1" color="text.secondary" fontStyle="italic">
+                        No activity
+                      </Typography>
+                    </Box>
                   )}
               </Stack>
             </CardContent>
           </Card>
-        ))}
-      </Stack>
+          );
+        })}
+        </Stack>
+      )}
+
+      {/* TIMELINE VIEW */}
+      {viewMode === 'timeline' && (
+        <Box>
+          {filteredBuckets.map((day, dayIndex) => {
+            const dayNumber = dayIndex + 1;
+            const [year, month, dayOfMonth] = day.date.split('-');
+            const formattedDate = `${dayOfMonth}-${month}-${year}`;
+            const allItems = [
+              ...day.flights.map((f, i) => ({ type: 'flight', data: f, time: f.departureDateTime.slice(11, 16), originalIndex: i })),
+              ...day.hotels.map((h, i) => ({ type: 'hotel', data: h, time: 'Check-in', originalIndex: i })),
+              ...day.rides.map((r, i) => ({ type: 'ride', data: r, time: r.time || r.pickupTime || '', originalIndex: i })),
+              ...day.attractions.map((a, i) => ({ type: 'attraction', data: a, time: a.scheduledTime || '', originalIndex: i }))
+            ];
+
+            if (allItems.length === 0 && filter === 'all') {
+              return (
+                <Card key={day.date} sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      DAY {dayNumber} - {formattedDate}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" fontStyle="italic" sx={{ textAlign: 'center', py: 2 }}>
+                      No activity
+                    </Typography>
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            if (allItems.length === 0) return null;
+
+            return (
+              <Card key={day.date} sx={{ mb: 2 }}>
+                <CardContent sx={{ bgcolor: 'grey.50', borderBottom: 1, borderColor: 'divider' }}>
+                  <Typography variant="h6" fontWeight={600}>
+                    DAY {dayNumber} - {formattedDate}
+                  </Typography>
+                </CardContent>
+                <CardContent>
+                  <Box sx={{ position: 'relative', pl: 4 }}>
+                    {/* Vertical Line */}
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: 15,
+                        top: 0,
+                        bottom: 0,
+                        width: 2,
+                        bgcolor: 'divider'
+                      }}
+                    />
+                    
+                    <Stack spacing={3}>
+                      {allItems.map((item, idx) => {
+                        const isExpanded = expandedItem?.type === item.type && expandedItem?.index === item.originalIndex;
+                        return (
+                          <Box key={idx} sx={{ position: 'relative' }}>
+                            {/* Timeline Dot */}
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                left: -27,
+                                top: 4,
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: item.type === 'flight' ? 'primary.main' : 
+                                         item.type === 'hotel' ? 'secondary.main' :
+                                         item.type === 'ride' ? 'info.main' : 'success.main',
+                                border: '3px solid white',
+                                boxShadow: 1
+                              }}
+                            />
+                            
+                            <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+                              <CardActionArea
+                                onClick={() => setExpandedItem(isExpanded ? null : { type: item.type, index: item.originalIndex })}
+                                sx={{ p: 2 }}
+                              >
+                                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                                  <Box sx={{ flex: 1 }}>
+                                    <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                                      {item.type === 'flight' && <FlightIcon fontSize="small" color="primary" />}
+                                      {item.type === 'hotel' && <HotelIcon fontSize="small" color="secondary" />}
+                                      {item.type === 'ride' && <DirectionsCar fontSize="small" color="info" />}
+                                      {item.type === 'attraction' && <AttractionsOutlined fontSize="small" color="success" />}
+                                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                                        {item.type.toUpperCase()}
+                                      </Typography>
+                                    </Stack>
+                                    
+                                    {item.type === 'flight' && (
+                                      <Box>
+                                        <Typography variant="body1" fontWeight={600}>
+                                          {(item.data as any).flightNumber} {(item.data as any).departureAirportCode}→{(item.data as any).arrivalAirportCode}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          {(item.data as any).departureDateTime.slice(11, 16)} - {(item.data as any).arrivalDateTime.slice(11, 16)}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                    
+                                    {item.type === 'hotel' && (
+                                      <Box>
+                                        <Typography variant="body1" fontWeight={600}>
+                                          {(item.data as any).name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Check-in: {(item.data as any).checkIn}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                    
+                                    {item.type === 'ride' && (
+                                      <Box>
+                                        <Typography variant="body1" fontWeight={600}>
+                                          {(item.data as any).pickup} → {(item.data as any).dropoff}
+                                        </Typography>
+                                        {(item.data as any).distance && (
+                                          <Typography variant="body2" color="text.secondary">
+                                            {(item.data as any).distance} • {(item.data as any).duration}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    )}
+                                    
+                                    {item.type === 'attraction' && (
+                                      <Box>
+                                        <Typography variant="body1" fontWeight={600}>
+                                          {(item.data as any).name}
+                                        </Typography>
+                                        {(item.data as any).scheduledTime && (
+                                          <Typography variant="body2" color="text.secondary">
+                                            {(item.data as any).scheduledTime}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    )}
+                                    
+                                    {item.data.cost && (
+                                      <Chip size="small" label={`$${item.data.cost}`} color="success" sx={{ mt: 1 }} />
+                                    )}
+                                  </Box>
+                                  
+                                  <Stack spacing={1} alignItems="flex-end">
+                                    {item.time && (
+                                      <Chip size="small" label={item.time} variant="outlined" />
+                                    )}
+                                    {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                                  </Stack>
+                                </Stack>
+                              </CardActionArea>
+                              
+                              <Collapse in={isExpanded}>
+                                <Box sx={{ px: 2, pb: 2, pt: 0.5, borderTop: 1, borderColor: 'divider' }}>
+                                  {item.type === 'flight' && (
+                                    <>
+                                      <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                        <strong>Flight Details</strong>
+                                      </Typography>
+                                      {(item.data as any).terminal?.departure && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Departure Terminal: {(item.data as any).terminal.departure}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).gate?.departure && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Departure Gate: {(item.data as any).gate.departure}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).terminal?.arrival && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Arrival Terminal: {(item.data as any).terminal.arrival}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).gate?.arrival && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Arrival Gate: {(item.data as any).gate.arrival}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).durationMinutes && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Duration: {Math.floor((item.data as any).durationMinutes / 60)}h {(item.data as any).durationMinutes % 60}m
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).aircraftType && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Aircraft: {(item.data as any).aircraftType}
+                                        </Typography>
+                                      )}
+                                      {((item.data as any).bookingNumber || (item.data as any).bookingAgency) && (
+                                        <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                                          <strong>Booking Info</strong>
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).bookingNumber && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Booking Number: {(item.data as any).bookingNumber}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).bookingAgency && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Agency: {(item.data as any).bookingAgency}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).carryOn !== undefined && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Carry-on: {(item.data as any).carryOn ? 'Included' : 'Not included'}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).checkedBag !== undefined && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Checked Bag: {(item.data as any).checkedBag ? 'Included' : 'Not included'}
+                                        </Typography>
+                                      )}
+                                    </>
+                                  )}
+                                  
+                                  {item.type === 'hotel' && (
+                                    <>
+                                      <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                        <strong>Hotel Details</strong>
+                                      </Typography>
+                                      {(item.data as any).address && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Address: {(item.data as any).address}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).checkOut && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Check-out: {(item.data as any).checkOut}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).nights && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Nights: {(item.data as any).nights}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).rating && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Rating: {(item.data as any).rating} ⭐
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).distanceFromAirport && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Distance from airport: {(item.data as any).distanceFromAirport}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).travelTimeFromAirport && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Travel time from airport: {(item.data as any).travelTimeFromAirport}
+                                        </Typography>
+                                      )}
+                                    </>
+                                  )}
+                                  
+                                  {item.type === 'ride' && (
+                                    <>
+                                      {(item.data as any).type === 'rental' && (
+                                        <>
+                                          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                            <strong>Rental Details</strong>
+                                          </Typography>
+                                          {(item.data as any).rentalCompany && (
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                              Company: {(item.data as any).rentalCompany}
+                                            </Typography>
+                                          )}
+                                          {(item.data as any).voucherNumber && (
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                              Voucher: {(item.data as any).voucherNumber}
+                                            </Typography>
+                                          )}
+                                          {(item.data as any).pickupDate && (
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                              Pickup Date: {(item.data as any).pickupDate}
+                                            </Typography>
+                                          )}
+                                          {(item.data as any).returnDate && (
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                              Return Date: {(item.data as any).returnDate}
+                                            </Typography>
+                                          )}
+                                        </>
+                                      )}
+                                      {(item.data as any).type === 'taxi' && (item.data as any).notes && (
+                                        <>
+                                          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                            <strong>Additional Info</strong>
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary" display="block">
+                                            Notes: {(item.data as any).notes}
+                                          </Typography>
+                                        </>
+                                      )}
+                                    </>
+                                  )}
+                                  
+                                  {item.type === 'attraction' && (
+                                    <>
+                                      <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                                        <strong>Attraction Details</strong>
+                                      </Typography>
+                                      {(item.data as any).address && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Address: {(item.data as any).address}
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).rating && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Rating: {(item.data as any).rating} ⭐
+                                        </Typography>
+                                      )}
+                                      {(item.data as any).website && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Website: <a href={(item.data as any).website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{(item.data as any).website}</a>
+                                        </Typography>
+                                      )}
+                                    </>
+                                  )}
+                                </Box>
+                              </Collapse>
+                            </Paper>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Box>
+      )}
+
+      {/* MAP VIEW */}
+      {viewMode === 'map' && (
+        <Card>
+          <CardContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Map view coming soon! This will show all your trip locations on an interactive map.
+            </Alert>
+            <Typography variant="body2" color="text.secondary">
+              Future features:
+            </Typography>
+            <ul>
+              <li><Typography variant="body2" color="text.secondary">Interactive map with all locations</Typography></li>
+              <li><Typography variant="body2" color="text.secondary">Click on markers to see activity details</Typography></li>
+              <li><Typography variant="body2" color="text.secondary">Flight paths, routes, and hotel locations</Typography></li>
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </Box>
   )
 }
