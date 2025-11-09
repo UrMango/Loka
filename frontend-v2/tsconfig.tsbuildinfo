@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/additemforms.tsx","./src/components/layout.tsx","./src/components/searchautocomplete.tsx","./src/pages/home.tsx","./src/pages/newtripwizard.tsx","./src/pages/tripdetails.tsx","./src/services/api.ts","./src/theme/theme.ts","./src/types/domain.ts"],"version":"5.9.3"}

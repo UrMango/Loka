@@ -1,0 +1,13 @@
+/* Minimal global styles for v1 */
+:root {
+  --bg: #f8fafc;
+}
+html, body, #root {
+  height: 100%;
+}
+body {
+  background: var(--bg);
+  margin: 0;
+  font-family: Inter, system-ui, Arial, sans-serif;
+}
+/* Do not style svg globally here */

@@ -1,0 +1,93 @@
+import axios from 'axios'
+import type { Trip, FlightSegment, HotelBooking, RideLeg, AttractionVisit } from '../types/domain'
+
+export const api = axios.create({ baseURL: '/api' })
+
+export async function listTrips(): Promise<Trip[]> {
+  const res = await api.get<Trip[]>('/trips')
+  return res.data
+}
+
+export async function getTrip(id: string): Promise<Trip> {
+  const res = await api.get<Trip>(`/trips/${id}`)
+  return res.data
+}
+
+export async function createTrip(data: Partial<Trip>): Promise<Trip> {
+  const res = await api.post<Trip>('/trips', data)
+  return res.data
+}
+
+export async function updateTrip(id: string, updates: Partial<Trip>): Promise<Trip> {
+  const res = await api.put<Trip>(`/trips/${id}`, updates)
+  return res.data
+}
+
+// Trip sub-resource mutations
+export async function addFlightToTrip(tripId: string, flight: any): Promise<Trip> {
+  const res = await api.post<Trip>(`/trips/${tripId}/flights`, flight)
+  return res.data
+}
+export async function addHotelToTrip(tripId: string, hotel: any): Promise<Trip> {
+  const res = await api.post<Trip>(`/trips/${tripId}/hotels`, hotel)
+  return res.data
+}
+export async function addRideToTrip(tripId: string, ride: any): Promise<Trip> {
+  const res = await api.post<Trip>(`/trips/${tripId}/rides`, ride)
+  return res.data
+}
+export async function addAttractionToTrip(tripId: string, attraction: any): Promise<Trip> {
+  const res = await api.post<Trip>(`/trips/${tripId}/attractions`, attraction)
+  return res.data
+}
+
+// Flights search via backend proxy
+export async function searchFlightByNumber(flightNumber: string, date: string) {
+  const res = await api.get(`/flights/search/${encodeURIComponent(flightNumber)}`, { params: { date } })
+  return res.data
+}
+
+// Flights by route
+export async function searchFlightsByRoute(from: string, to: string, date: string, opts?: { directOnly?: boolean; airline?: string }) {
+  const params: any = { from, to, date }
+  if (opts?.directOnly !== undefined) params.directOnly = String(opts.directOnly)
+  if (opts?.airline) params.airline = opts.airline
+  const res = await api.get('/flights/search-route', { params })
+  return res.data as { flights: Array<any> }
+}
+
+// Airports autocomplete/search
+export async function searchAirports(query: string) {
+  const res = await api.get('/flights/airports/search', { params: { query } })
+  return res.data as { airports: Array<{ code: string; name: string; city: string; country: string }> }
+}
+
+// Hotels via backend
+export async function hotelAutocomplete(input: string) {
+  const res = await api.get('/hotels/autocomplete', { params: { input } })
+  return res.data
+}
+export async function hotelDetails(place_id: string) {
+  const res = await api.get('/hotels/details', { params: { place_id } })
+  return res.data
+}
+export async function hotelDistanceFromAirport(hotel_place_id: string, airport_code: string) {
+  const res = await api.get('/hotels/distance-from-airport', { params: { hotel_place_id, airport_code } })
+  return res.data
+}
+
+// Rides / Distance
+export async function rideDistance(from: string, to: string, mode: string = 'driving') {
+  const res = await api.get('/rides/distance', { params: { from, to, mode } })
+  return res.data
+}
+
+// Places / Attractions
+export async function placesAutocomplete(input: string, types: string = 'establishment') {
+  const res = await api.get('/places/autocomplete', { params: { input, types } })
+  return res.data
+}
+export async function placeDetails(place_id: string) {
+  const res = await api.get('/places/details', { params: { place_id } })
+  return res.data
+}
