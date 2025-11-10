@@ -108,6 +108,11 @@ export async function rideDistance(from: string, to: string, mode: string = 'dri
   return res.data
 }
 
+export async function calculateRideRoute(origin: string, destination: string) {
+  const res = await api.post('/rides/calculate-route', { origin, destination })
+  return res.data
+}
+
 // Places / Attractions
 export async function placesAutocomplete(input: string, types: string = 'establishment') {
   const res = await api.get('/places/autocomplete', { params: { input, types } })

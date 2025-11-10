@@ -10,6 +10,8 @@ export interface FlightSegment {
   terminal?: { departure: string | null, arrival: string | null }
   gate?: { departure: string | null, arrival: string | null }
   cost?: number
+  numberOfTickets?: number
+  costType?: 'per-ticket' | 'total'
   carryOn?: boolean
   checkedBag?: boolean
   bookingNumber?: string
@@ -62,6 +64,8 @@ export interface AttractionVisit {
   rating?: number | null
   website?: string
   cost?: number
+  numberOfTickets?: number
+  costType?: 'per-ticket' | 'total'
 }
 
 export interface Trip {

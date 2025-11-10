@@ -46,6 +46,45 @@ router.get('/distance', async (req, res) => {
   }
 })
 
+// Calculate route with Google Distance Matrix API (for Generate Ride feature)
+router.post('/calculate-route', async (req, res) => {
+  try {
+    const { origin, destination } = req.body
+
+    if (!origin || !destination) {
+      return res.status(400).json({ error: 'origin and destination are required' })
+    }
+
+    const distanceData = await googleApi.getDistanceMatrix(origin, destination, 'driving')
+
+    if (distanceData.rows?.[0]?.elements?.[0]?.status !== 'OK') {
+      const status = distanceData.rows?.[0]?.elements?.[0]?.status || 'UNKNOWN_ERROR'
+      return res.status(400).json({ 
+        error: 'Could not calculate route',
+        status,
+        details: 'Please ensure both locations are valid addresses or place names'
+      })
+    }
+
+    const element = distanceData.rows[0].elements[0]
+
+    res.json({
+      distance: element.distance.text,
+      duration: element.duration.text,
+      distanceValue: element.distance.value, // in meters
+      durationValue: element.duration.value, // in seconds
+      originAddress: distanceData.origin_addresses[0],
+      destinationAddress: distanceData.destination_addresses[0]
+    })
+  } catch (error) {
+    console.error('Route calculation error:', error.message)
+    res.status(500).json({ 
+      error: 'Failed to calculate route',
+      message: error.message 
+    })
+  }
+})
+
 // Get location suggestions for ride pickup/dropoff
 router.get('/location-autocomplete', async (req, res) => {
   try {

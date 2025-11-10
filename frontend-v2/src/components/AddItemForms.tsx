@@ -61,6 +61,8 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
   
   // User inputs
   const [cost, setCost] = useState<string>('')
+  const [numberOfTickets, setNumberOfTickets] = useState<string>('')
+  const [costType, setCostType] = useState<'per-ticket' | 'total'>('total')
   const [carryOn, setCarryOn] = useState(false)
   const [checked, setChecked] = useState(false)
   const [bookingNumber, setBookingNumber] = useState('')
@@ -113,6 +115,8 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
           terminal: flightData.terminal,
           gate: flightData.gate,
           cost: cost ? Number(cost) : undefined,
+          numberOfTickets: numberOfTickets ? Number(numberOfTickets) : undefined,
+          costType: costType,
           carryOn,
           checkedBag: checked,
           bookingNumber: bookingNumber || undefined,
@@ -135,6 +139,8 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
           },
           gate: selectedFlight.gate,
           cost: cost ? Number(cost) : undefined,
+          numberOfTickets: numberOfTickets ? Number(numberOfTickets) : undefined,
+          costType: costType,
           carryOn,
           checkedBag: checked,
           bookingNumber: bookingNumber || undefined,
@@ -153,6 +159,8 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
           departureDateTime: depDateTime,
           arrivalDateTime: arrDateTime,
           cost: cost ? Number(cost) : undefined,
+          numberOfTickets: numberOfTickets ? Number(numberOfTickets) : undefined,
+          costType: costType,
           carryOn,
           checkedBag: checked,
           bookingNumber: bookingNumber || undefined,
@@ -168,7 +176,7 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
       setOrigin(null); setDestination(null); setRouteFlights([]); setSelectedFlight(null)
       setAirline(''); setDepartureAirport(''); setArrivalAirport('')
       setDepartureTime(''); setArrivalTime('')
-      setCost(''); setCarryOn(false); setChecked(false); setBookingNumber(''); setBookingAgency('')
+      setCost(''); setNumberOfTickets(''); setCostType('total'); setCarryOn(false); setChecked(false); setBookingNumber(''); setBookingAgency('')
       setMode('search')
       onDone?.()
     } catch (e: any) {
@@ -605,25 +613,62 @@ export function AddFlightForm({ tripId, onUpdated, onDone }: { tripId: string, o
         </>
       )}
 
-      {/* User Inputs for Manual Mode */}
-      {mode === 'manual' && (
+      {/* Ticket and Cost Information (shown for all modes) */}
+      {((mode === 'search' && flightData) || (mode === 'route' && selectedFlight) || mode === 'manual') && (
         <Card variant="outlined" sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="subtitle1" gutterBottom fontWeight="bold">
-              Additional Details
+              Ticket & Cost Information
             </Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={4}>
                 <TextField
                   fullWidth
-                  label="Ticket Cost"
-                  placeholder="Enter ticket price"
+                  label="Number of Tickets"
+                  placeholder="e.g. 2"
+                  type="number"
+                  value={numberOfTickets}
+                  onChange={e => setNumberOfTickets(e.target.value)}
+                  inputProps={{ min: 1 }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="Cost"
+                  placeholder="Enter price"
                   type="number"
                   value={cost}
                   onChange={e => setCost(e.target.value)}
                   InputProps={{ startAdornment: '$' }}
                 />
               </Grid>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Cost Type</InputLabel>
+                  <Select
+                    value={costType}
+                    label="Cost Type"
+                    onChange={e => setCostType(e.target.value as 'per-ticket' | 'total')}
+                  >
+                    <MenuItem value="per-ticket">Per Ticket</MenuItem>
+                    <MenuItem value="total">Total</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* User Inputs for Manual Mode */}
+      {mode === 'manual' && (
+        <Card variant="outlined" sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+              Booking Details
+            </Typography>
+            <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -1447,6 +1492,8 @@ export function AddAttractionForm({ tripId, onUpdated, onDone }: { tripId: strin
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [cost, setCost] = useState('')
+  const [numberOfTickets, setNumberOfTickets] = useState('')
+  const [costType, setCostType] = useState<'per-ticket' | 'total'>('total')
   const [busy, setBusy] = useState(false)
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -1496,10 +1543,12 @@ export function AddAttractionForm({ tripId, onUpdated, onDone }: { tripId: strin
         scheduledTime: time || undefined,
         rating: placeDetail?.rating || null,
         cost: cost ? Number(cost) : undefined,
+        numberOfTickets: numberOfTickets ? Number(numberOfTickets) : undefined,
+        costType: costType,
       }
       const updated = await addAttractionToTrip(tripId, payload as any)
       onUpdated(updated)
-      setSearchQuery(''); setSearchResults([]); setSel(null); setPlaceDetail(null); setDate(''); setTime(''); setCost('')
+      setSearchQuery(''); setSearchResults([]); setSel(null); setPlaceDetail(null); setDate(''); setTime(''); setCost(''); setNumberOfTickets(''); setCostType('total')
       onDone?.()
     } catch (e:any) { setErr(e?.response?.data?.message || e.message) } finally { setBusy(false) }
   }
@@ -1613,7 +1662,7 @@ export function AddAttractionForm({ tripId, onUpdated, onDone }: { tripId: strin
                     Visit Details
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={4}>
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
                         type="date"
@@ -1624,7 +1673,7 @@ export function AddAttractionForm({ tripId, onUpdated, onDone }: { tripId: strin
                         required
                       />
                     </Grid>
-                    <Grid item xs={12} sm={4}>
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
                         type="time"
@@ -1637,12 +1686,36 @@ export function AddAttractionForm({ tripId, onUpdated, onDone }: { tripId: strin
                     <Grid item xs={12} sm={4}>
                       <TextField
                         fullWidth
+                        label="Number of Tickets"
+                        placeholder="e.g. 2"
+                        type="number"
+                        value={numberOfTickets}
+                        onChange={e => setNumberOfTickets(e.target.value)}
+                        inputProps={{ min: 1 }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
                         label="Cost"
                         placeholder="Optional"
                         type="number"
                         value={cost}
                         onChange={e => setCost(e.target.value)}
                       />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <FormControl fullWidth>
+                        <InputLabel>Cost Type</InputLabel>
+                        <Select
+                          value={costType}
+                          label="Cost Type"
+                          onChange={e => setCostType(e.target.value as 'per-ticket' | 'total')}
+                        >
+                          <MenuItem value="per-ticket">Per Ticket</MenuItem>
+                          <MenuItem value="total">Total</MenuItem>
+                        </Select>
+                      </FormControl>
                     </Grid>
                   </Grid>
                 </CardContent>

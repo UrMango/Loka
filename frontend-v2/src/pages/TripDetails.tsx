@@ -4,6 +4,7 @@ import { getTrip, GOOGLE_MAPS_API_KEY, deleteTrip, deleteFlightFromTrip, deleteH
 import type { Trip } from '../types/domain'
 import { groupTripByDay } from '../types/domain'
 import { AddFlightForm, AddHotelForm, AddRideForm, AddAttractionForm } from '../components/AddItemForms'
+import GenerateRide from '../components/GenerateRide'
 import { GoogleMap, LoadScript, Marker, InfoWindow, Polyline, DirectionsService, DirectionsRenderer } from '@react-google-maps/api'
 import {
   Box,
@@ -258,10 +259,30 @@ export default function TripDetails() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type: 'trip' | 'flight' | 'hotel' | 'ride' | 'attraction' | null; index?: number }>({ open: false, type: null })
   const [editTrip, setEditTrip] = useState<{ open: boolean; name: string; destinations: string; startDate: string; endDate: string }>({ open: false, name: '', destinations: '', startDate: '', endDate: '' })
   const [editItem, setEditItem] = useState<{ open: boolean; type: 'flight' | 'hotel' | 'ride' | 'attraction' | null; index: number; data: any }>({ open: false, type: null, index: -1, data: null })
+  const [showGenerateRide, setShowGenerateRide] = useState(false)
+  const [selectedItems, setSelectedItems] = useState<Array<{ type: string; index: number; name: string; address: string; date?: string; time?: string }>>([])
 
   useEffect(() => {
     if (id) getTrip(id).then(setTrip).catch(e => setError(e.message))
   }, [id])
+
+  // Helper function to extract time from datetime string (handles both formats)
+  const extractTime = (dateTimeStr: string): string => {
+    if (!dateTimeStr) return ''
+    // Handle both ISO format (2025-11-13T10:20:00) and space format (2025-11-13 10:20+02:00)
+    const parts = dateTimeStr.includes('T') ? dateTimeStr.split('T') : dateTimeStr.split(' ')
+    return parts[1]?.slice(0, 5) || ''
+  }
+
+  // Helper function to format datetime for datetime-local input (handles both formats)
+  const formatDateTimeForInput = (dateTimeStr: string): string => {
+    if (!dateTimeStr) return ''
+    // Handle both ISO format (2025-11-13T10:20:00) and space format (2025-11-13 10:20+02:00)
+    const parts = dateTimeStr.includes('T') ? dateTimeStr.split('T') : dateTimeStr.split(' ')
+    const datePart = parts[0]
+    const timePart = parts[1]?.slice(0, 5) || '00:00'
+    return `${datePart}T${timePart}`
+  }
 
   const handleDeleteTrip = async () => {
     if (!id) return
@@ -322,6 +343,57 @@ export default function TripDetails() {
 
   const handleEditItemOpen = (type: 'flight' | 'hotel' | 'ride' | 'attraction', index: number, data: any) => {
     setEditItem({ open: true, type, index, data: { ...data } })
+  }
+
+  const handleItemSelect = (type: string, index: number, item: any) => {
+    // Adjust type for flights first (before checking if selected)
+    let adjustedType = type
+    if (type === 'flight') {
+      adjustedType = 'flight-arr'
+    }
+    
+    const itemId = `${adjustedType}-${index}`
+    const existingIndex = selectedItems.findIndex(sel => `${sel.type}-${sel.index}` === itemId)
+    
+    if (existingIndex >= 0) {
+      // Deselect
+      setSelectedItems(selectedItems.filter((_, i) => i !== existingIndex))
+    } else if (selectedItems.length < 2) {
+      // Select (max 2 items)
+      let name = ''
+      let address = ''
+      let date = ''
+      let time = ''
+      
+      if (type === 'flight') {
+        // For flights, use arrival airport location (where you land)
+        name = `${item.arrivalAirportCode} Airport`
+        address = item.arrivalAirportCode
+        // Handle both ISO format (2025-11-13T05:15:00) and space format (2025-11-13 05:15+02:00)
+        const dateTimeParts = item.arrivalDateTime.includes('T') 
+          ? item.arrivalDateTime.split('T') 
+          : item.arrivalDateTime.split(' ')
+        date = dateTimeParts[0]
+        time = dateTimeParts[1]?.slice(0, 5)
+      } else if (type === 'hotel') {
+        name = item.name
+        address = item.address
+        date = item.checkIn.split('T')[0]
+      } else if (type === 'attraction') {
+        name = item.name
+        address = item.address
+        date = item.scheduledDate.split('T')[0]
+        time = item.scheduledTime
+      }
+      
+      setSelectedItems([...selectedItems, { type: adjustedType, index, name, address, date, time }])
+    }
+  }
+
+  const handleCreateRideFromSelection = () => {
+    if (selectedItems.length === 2) {
+      setShowGenerateRide(true)
+    }
   }
 
   const handleEditItemSave = async () => {
@@ -404,6 +476,21 @@ export default function TripDetails() {
             Back to Trips
           </Button>
           <Stack direction="row" spacing={1}>
+            <Button
+              startIcon={<DirectionsCar />}
+              onClick={() => setShowGenerateRide(true)}
+              sx={{ 
+                color: 'white', 
+                borderColor: 'rgba(255,255,255,0.5)',
+                '&:hover': { 
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  borderColor: 'rgba(255,255,255,0.8)'
+                }
+              }}
+              variant="outlined"
+            >
+              Generate Ride
+            </Button>
             <Button
               startIcon={<EditIcon />}
               onClick={handleEditTripOpen}
@@ -721,23 +808,38 @@ export default function TripDetails() {
                       </Typography>
                     </Stack>
                     {day.flights.map((f, i) => {
-                      const isExpanded = expandedItem?.type === 'flight' && expandedItem?.index === i;
+                      // Find global index of this flight in trip.flights
+                      const globalIndex = trip.flights.findIndex(flight => 
+                        flight.flightNumber === f.flightNumber && flight.departureDateTime === f.departureDateTime
+                      );
+                      const isExpanded = expandedItem?.type === 'flight' && expandedItem?.index === globalIndex;
+                      const isSelected = selectedItems.some(sel => sel.type === 'flight-arr' && sel.index === globalIndex);
                       return (
-                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden' }}>
+                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden', bgcolor: isSelected ? 'action.selected' : 'inherit' }}>
                           <CardActionArea
-                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'flight', index: i })}
+                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'flight', index: globalIndex })}
                             sx={{ p: 1.5 }}
                           >
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
-                              <Box>
-                                <Typography variant="body2">
-                                  <strong>{f.flightNumber}</strong> {f.departureAirportCode}→{f.arrivalAirportCode}
-                                </Typography>
-                                <Stack direction="row" spacing={2} mt={0.5}>
-                                  <Chip icon={<AccessTime />} size="small" label={`${f.departureDateTime.slice(11, 16)} - ${f.arrivalDateTime.slice(11, 16)}`} />
-                                  {f.cost && <Chip size="small" label={`$${f.cost}`} color="success" />}
-                                </Stack>
-                              </Box>
+                              <Stack direction="row" spacing={1} alignItems="center" flex={1}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleItemSelect('flight', globalIndex, f)
+                                  }}
+                                  disabled={selectedItems.length >= 2 && !isSelected}
+                                />
+                                <Box>
+                                  <Typography variant="body2">
+                                    <strong>{f.flightNumber}</strong> {f.departureAirportCode}→{f.arrivalAirportCode}
+                                  </Typography>
+                                  <Stack direction="row" spacing={2} mt={0.5}>
+                                    <Chip icon={<AccessTime />} size="small" label={`${extractTime(f.departureDateTime)} - ${extractTime(f.arrivalDateTime)}`} />
+                                    {f.cost && <Chip size="small" label={`$${f.cost}`} color="success" />}
+                                  </Stack>
+                                </Box>
+                              </Stack>
                               {isExpanded ? <ExpandLess /> : <ExpandMore />}
                             </Stack>
                           </CardActionArea>
@@ -801,6 +903,16 @@ export default function TripDetails() {
                                   Checked Bag: {f.checkedBag ? 'Included' : 'Not included'}
                                 </Typography>
                               )}
+                              {f.numberOfTickets && (
+                                <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                                  <strong>Tickets:</strong> {f.numberOfTickets} {f.numberOfTickets === 1 ? 'ticket' : 'tickets'}
+                                  {f.cost && f.costType && (
+                                    <span>
+                                      {' • '}{f.costType === 'per-ticket' ? `$${f.cost} per ticket (Total: $${f.cost * f.numberOfTickets})` : `Total: $${f.cost}`}
+                                    </span>
+                                  )}
+                                </Typography>
+                              )}
                               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                                 <Button
                                   size="small"
@@ -835,23 +947,38 @@ export default function TripDetails() {
                       </Typography>
                     </Stack>
                     {day.hotels.map((h, i) => {
-                      const isExpanded = expandedItem?.type === 'hotel' && expandedItem?.index === i;
+                      // Find global index of this hotel in trip.hotels
+                      const globalIndex = trip.hotels.findIndex(hotel => 
+                        hotel.name === h.name && hotel.address === h.address && hotel.checkIn === h.checkIn
+                      );
+                      const isExpanded = expandedItem?.type === 'hotel' && expandedItem?.index === globalIndex;
+                      const isSelected = selectedItems.some(sel => sel.type === 'hotel' && sel.index === globalIndex);
                       return (
-                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden' }}>
+                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden', bgcolor: isSelected ? 'action.selected' : 'inherit' }}>
                           <CardActionArea
-                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'hotel', index: i })}
+                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'hotel', index: globalIndex })}
                             sx={{ p: 1.5 }}
                           >
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
-                              <Box>
-                                <Typography variant="body2">
-                                  <strong>{h.name}</strong>
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block">
-                                  Check-in: {h.checkIn}
-                                </Typography>
-                                {h.cost && <Chip size="small" label={`$${h.cost}`} color="success" sx={{ mt: 0.5 }} />}
-                              </Box>
+                              <Stack direction="row" spacing={1} alignItems="center" flex={1}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleItemSelect('hotel', globalIndex, h)
+                                  }}
+                                  disabled={selectedItems.length >= 2 && !isSelected}
+                                />
+                                <Box>
+                                  <Typography variant="body2">
+                                    <strong>{h.name}</strong>
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" display="block">
+                                    Check-in: {h.checkIn}
+                                  </Typography>
+                                  {h.cost && <Chip size="small" label={`$${h.cost}`} color="success" sx={{ mt: 0.5 }} />}
+                                </Box>
+                              </Stack>
                               {isExpanded ? <ExpandLess /> : <ExpandMore />}
                             </Stack>
                           </CardActionArea>
@@ -1046,25 +1173,40 @@ export default function TripDetails() {
                       </Typography>
                     </Stack>
                     {day.attractions.map((a, i) => {
-                      const isExpanded = expandedItem?.type === 'attraction' && expandedItem?.index === i;
+                      // Find global index of this attraction in trip.attractions
+                      const globalIndex = trip.attractions.findIndex(attr => 
+                        attr.name === a.name && attr.address === a.address && attr.scheduledDate === a.scheduledDate
+                      );
+                      const isExpanded = expandedItem?.type === 'attraction' && expandedItem?.index === globalIndex;
+                      const isSelected = selectedItems.some(sel => sel.type === 'attraction' && sel.index === globalIndex);
                       return (
-                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden' }}>
+                        <Paper key={i} variant="outlined" sx={{ mb: 1, overflow: 'hidden', bgcolor: isSelected ? 'action.selected' : 'inherit' }}>
                           <CardActionArea
-                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'attraction', index: i })}
+                            onClick={() => setExpandedItem(isExpanded ? null : { type: 'attraction', index: globalIndex })}
                             sx={{ p: 1.5 }}
                           >
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
-                              <Box>
-                                <Typography variant="body2">
-                                  <strong>{a.name}</strong>
-                                </Typography>
-                                <Stack direction="row" spacing={1} mt={0.5} flexWrap="wrap">
-                                  {a.scheduledTime && (
-                                    <Chip icon={<AccessTime />} size="small" label={a.scheduledTime} />
-                                  )}
-                                  {a.cost && <Chip size="small" label={`$${a.cost}`} color="success" />}
-                                </Stack>
-                              </Box>
+                              <Stack direction="row" spacing={1} alignItems="center" flex={1}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleItemSelect('attraction', globalIndex, a)
+                                  }}
+                                  disabled={selectedItems.length >= 2 && !isSelected}
+                                />
+                                <Box>
+                                  <Typography variant="body2">
+                                    <strong>{a.name}</strong>
+                                  </Typography>
+                                  <Stack direction="row" spacing={1} mt={0.5} flexWrap="wrap">
+                                    {a.scheduledTime && (
+                                      <Chip icon={<AccessTime />} size="small" label={a.scheduledTime} />
+                                    )}
+                                    {a.cost && <Chip size="small" label={`$${a.cost}`} color="success" />}
+                                  </Stack>
+                                </Box>
+                              </Stack>
                               {isExpanded ? <ExpandLess /> : <ExpandMore />}
                             </Stack>
                           </CardActionArea>
@@ -1091,6 +1233,16 @@ export default function TripDetails() {
                               {a.scheduledDate && (
                                 <Typography variant="caption" color="text.secondary" display="block">
                                   Scheduled: {a.scheduledDate} {a.scheduledTime && `at ${a.scheduledTime}`}
+                                </Typography>
+                              )}
+                              {a.numberOfTickets && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  <strong>Tickets:</strong> {a.numberOfTickets} {a.numberOfTickets === 1 ? 'ticket' : 'tickets'}
+                                  {a.cost && a.costType && (
+                                    <span>
+                                      {' • '}{a.costType === 'per-ticket' ? `$${a.cost} per ticket (Total: $${a.cost * a.numberOfTickets})` : `Total: $${a.cost}`}
+                                    </span>
+                                  )}
                                 </Typography>
                               )}
                               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
@@ -1144,7 +1296,7 @@ export default function TripDetails() {
             const [year, month, dayOfMonth] = day.date.split('-');
             const formattedDate = `${dayOfMonth}-${month}-${year}`;
             const allItems = [
-              ...day.flights.map((f, i) => ({ type: 'flight', data: f, time: f.departureDateTime.slice(11, 16), originalIndex: i })),
+              ...day.flights.map((f, i) => ({ type: 'flight', data: f, time: extractTime(f.departureDateTime), originalIndex: i })),
               ...day.hotels.map((h, i) => ({ type: 'hotel', data: h, time: 'Check-in', originalIndex: i })),
               ...day.rides.map((r, i) => ({ type: 'ride', data: r, time: r.time || r.pickupTime || '', originalIndex: i })),
               ...day.attractions.map((a, i) => ({ type: 'attraction', data: a, time: a.scheduledTime || '', originalIndex: i }))
@@ -1233,7 +1385,7 @@ export default function TripDetails() {
                                           {(item.data as any).flightNumber} {(item.data as any).departureAirportCode}→{(item.data as any).arrivalAirportCode}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
-                                          {(item.data as any).departureDateTime.slice(11, 16)} - {(item.data as any).arrivalDateTime.slice(11, 16)}
+                                          {extractTime((item.data as any).departureDateTime)} - {extractTime((item.data as any).arrivalDateTime)}
                                         </Typography>
                                       </Box>
                                     )}
@@ -1477,6 +1629,46 @@ export default function TripDetails() {
         <TripMapView trip={trip} />
       )}
 
+      {/* Floating Action Button for Create Ride from Selection */}
+      {selectedItems.length === 2 && (
+        <Box
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1000
+          }}
+        >
+          <Stack spacing={1} alignItems="flex-end">
+            <Paper elevation={4} sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <DirectionsCar />
+                <Typography variant="body2">
+                  2 locations selected
+                </Typography>
+              </Stack>
+            </Paper>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                onClick={() => setSelectedItems([])}
+                sx={{ bgcolor: 'white' }}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<DirectionsCar />}
+                onClick={handleCreateRideFromSelection}
+                size="large"
+              >
+                Create Ride
+              </Button>
+            </Stack>
+          </Stack>
+        </Box>
+      )}
+
       {/* Edit Trip Dialog */}
       <Dialog open={editTrip.open} onClose={() => setEditTrip({ ...editTrip, open: false })} maxWidth="sm" fullWidth>
         <DialogTitle>Edit Trip</DialogTitle>
@@ -1592,7 +1784,7 @@ export default function TripDetails() {
                   fullWidth
                   type="datetime-local"
                   label="Departure Date & Time"
-                  value={editItem.data.departureDateTime?.slice(0, 16) || ''}
+                  value={formatDateTimeForInput(editItem.data.departureDateTime || '')}
                   onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, departureDateTime: e.target.value } })}
                   InputLabelProps={{ shrink: true }}
                 />
@@ -1600,7 +1792,7 @@ export default function TripDetails() {
                   fullWidth
                   type="datetime-local"
                   label="Arrival Date & Time"
-                  value={editItem.data.arrivalDateTime?.slice(0, 16) || ''}
+                  value={formatDateTimeForInput(editItem.data.arrivalDateTime || '')}
                   onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, arrivalDateTime: e.target.value } })}
                   InputLabelProps={{ shrink: true }}
                 />
@@ -1609,23 +1801,44 @@ export default function TripDetails() {
                 <TextField
                   fullWidth
                   type="number"
+                  label="Number of Tickets"
+                  value={editItem.data.numberOfTickets || ''}
+                  onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, numberOfTickets: Number(e.target.value) } })}
+                  inputProps={{ min: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  type="number"
                   label="Cost"
                   value={editItem.data.cost || ''}
                   onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, cost: Number(e.target.value) } })}
                 />
+                <FormControl fullWidth>
+                  <InputLabel>Cost Type</InputLabel>
+                  <Select
+                    value={editItem.data.costType || 'total'}
+                    label="Cost Type"
+                    onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, costType: e.target.value } })}
+                  >
+                    <MenuItem value="per-ticket">Per Ticket</MenuItem>
+                    <MenuItem value="total">Total</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box display="flex" gap={2}>
                 <TextField
                   fullWidth
                   label="Booking Number"
                   value={editItem.data.bookingNumber || ''}
                   onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, bookingNumber: e.target.value } })}
                 />
+                <TextField
+                  fullWidth
+                  label="Booking Agency"
+                  value={editItem.data.bookingAgency || ''}
+                  onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, bookingAgency: e.target.value } })}
+                />
               </Box>
-              <TextField
-                fullWidth
-                label="Booking Agency"
-                value={editItem.data.bookingAgency || ''}
-                onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, bookingAgency: e.target.value } })}
-              />
               <Box display="flex" gap={2}>
                 <FormControlLabel
                   control={
@@ -1919,10 +2132,31 @@ export default function TripDetails() {
                 <TextField
                   fullWidth
                   type="number"
+                  label="Number of Tickets"
+                  value={editItem.data.numberOfTickets || ''}
+                  onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, numberOfTickets: Number(e.target.value) } })}
+                  inputProps={{ min: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  type="number"
                   label="Cost"
                   value={editItem.data.cost || ''}
                   onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, cost: Number(e.target.value) } })}
                 />
+                <FormControl fullWidth>
+                  <InputLabel>Cost Type</InputLabel>
+                  <Select
+                    value={editItem.data.costType || 'total'}
+                    label="Cost Type"
+                    onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, costType: e.target.value } })}
+                  >
+                    <MenuItem value="per-ticket">Per Ticket</MenuItem>
+                    <MenuItem value="total">Total</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box display="flex" gap={2}>
                 <TextField
                   fullWidth
                   type="number"
@@ -1931,13 +2165,13 @@ export default function TripDetails() {
                   onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, rating: Number(e.target.value) } })}
                   inputProps={{ min: 0, max: 5, step: 0.1 }}
                 />
+                <TextField
+                  fullWidth
+                  label="Website"
+                  value={editItem.data.website || ''}
+                  onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, website: e.target.value } })}
+                />
               </Box>
-              <TextField
-                fullWidth
-                label="Website"
-                value={editItem.data.website || ''}
-                onChange={(e) => setEditItem({ ...editItem, data: { ...editItem.data, website: e.target.value } })}
-              />
             </Stack>
           </DialogContent>
           <DialogActions>
@@ -1950,6 +2184,38 @@ export default function TripDetails() {
           </DialogActions>
         </Dialog>
       )}
+
+      {/* Generate Ride Dialog */}
+      <Dialog 
+        open={showGenerateRide} 
+        onClose={() => setShowGenerateRide(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Generate Ride Between Locations</Typography>
+            <IconButton onClick={() => setShowGenerateRide(false)}>
+              <Close />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <GenerateRide
+            trip={trip}
+            onRideAdded={(updatedTrip) => {
+              setTrip(updatedTrip)
+              setShowGenerateRide(false)
+              setSelectedItems([])
+            }}
+            onClose={() => {
+              setShowGenerateRide(false)
+              setSelectedItems([])
+            }}
+            initialSelection={selectedItems.length === 2 ? selectedItems : undefined}
+          />
+        </DialogContent>
+      </Dialog>
     </Box>
   )
 }
