@@ -1,5 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Autocomplete, TextField, CircularProgress, Box, Typography } from '@mui/material';
+import {
+  Autocomplete,
+  TextField,
+  CircularProgress,
+  Box,
+  Typography,
+} from '@mui/material';
 
 interface SearchAutocompleteProps<T> {
   label?: string;
@@ -26,7 +32,7 @@ export function SearchAutocomplete<T>(props: SearchAutocompleteProps<T>) {
     disabled,
     value = null,
     renderOptionExtra,
-    isOptionEqualToValue
+    isOptionEqualToValue,
   } = props;
 
   const [inputValue, setInputValue] = useState('');
@@ -65,7 +71,10 @@ export function SearchAutocomplete<T>(props: SearchAutocompleteProps<T>) {
         active && setLoading(false);
       }
     }, 500);
-    return () => { active = false; clearTimeout(handle); };
+    return () => {
+      active = false;
+      clearTimeout(handle);
+    };
   }, [inputValue, minChars, fetchOptions, disabled]);
 
   // Provide stable option label
@@ -91,7 +100,13 @@ export function SearchAutocomplete<T>(props: SearchAutocompleteProps<T>) {
       filterOptions={(x) => x}
       disabled={disabled}
       isOptionEqualToValue={isOptionEqualToValue}
-      noOptionsText={inputValue.length < minChars ? `Type at least ${minChars} characters` : error ? error : 'No results'}
+      noOptionsText={
+        inputValue.length < minChars
+          ? `Type at least ${minChars} characters`
+          : error
+            ? error
+            : 'No results'
+      }
       renderInput={(params) => (
         <TextField
           {...params}
@@ -104,17 +119,26 @@ export function SearchAutocomplete<T>(props: SearchAutocompleteProps<T>) {
                 {loading && <CircularProgress size={20} />}
                 {params.InputProps.endAdornment}
               </>
-            )
+            ),
           }}
         />
       )}
       renderOption={(liProps, option) => {
         const { key, ...rest } = liProps as any;
         return (
-          <Box component="li" key={key} {...rest} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Box
+            component="li"
+            key={key}
+            {...rest}
+            sx={{ display: 'flex', flexDirection: 'column' }}
+          >
             <Typography variant="body2">{getLabel(option as T)}</Typography>
             {renderOptionExtra && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
                 {renderOptionExtra(option as T)}
               </Typography>
             )}

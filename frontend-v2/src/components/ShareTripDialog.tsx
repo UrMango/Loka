@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -15,122 +15,126 @@ import {
   Box,
   Chip,
   Alert,
-  CircularProgress
-} from '@mui/material'
-import { Close as CloseIcon, PersonRemove as RemoveIcon, Share as ShareIcon } from '@mui/icons-material'
-import { shareTrip, revokeAccess } from '../services/api'
+  CircularProgress,
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  PersonRemove as RemoveIcon,
+  Share as ShareIcon,
+} from '@mui/icons-material';
+import { shareTrip, revokeAccess } from '../services/api';
 
 interface SharedUser {
-  userId: string
-  email: string
-  name: string
-  sharedAt: string
+  userId: string;
+  email: string;
+  name: string;
+  sharedAt: string;
 }
 
 interface ShareTripDialogProps {
-  open: boolean
-  onClose: () => void
-  tripId: string
-  tripName: string
-  sharedWith: SharedUser[]
-  onUpdate: () => void
+  open: boolean;
+  onClose: () => void;
+  tripId: string;
+  tripName: string;
+  sharedWith: SharedUser[];
+  onUpdate: () => void;
 }
 
-export default function ShareTripDialog({ 
-  open, 
-  onClose, 
-  tripId, 
-  tripName, 
+export default function ShareTripDialog({
+  open,
+  onClose,
+  tripId,
+  tripName,
   sharedWith = [],
-  onUpdate 
+  onUpdate,
 }: ShareTripDialogProps) {
-  const [email, setEmail] = useState('')
-  const [emails, setEmails] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [email, setEmail] = useState('');
+  const [emails, setEmails] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleAddEmail = () => {
-    const trimmedEmail = email.trim().toLowerCase()
-    
-    if (!trimmedEmail) return
-    
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail) return;
+
     // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      setError('Please enter a valid email address')
-      return
+      setError('Please enter a valid email address');
+      return;
     }
-    
+
     if (emails.includes(trimmedEmail)) {
-      setError('Email already added')
-      return
+      setError('Email already added');
+      return;
     }
-    
-    setEmails([...emails, trimmedEmail])
-    setEmail('')
-    setError('')
-  }
+
+    setEmails([...emails, trimmedEmail]);
+    setEmail('');
+    setError('');
+  };
 
   const handleRemoveEmail = (emailToRemove: string) => {
-    setEmails(emails.filter(e => e !== emailToRemove))
-  }
+    setEmails(emails.filter((e) => e !== emailToRemove));
+  };
 
   const handleShare = async () => {
     if (emails.length === 0) {
-      setError('Please add at least one email address')
-      return
+      setError('Please add at least one email address');
+      return;
     }
 
-    setLoading(true)
-    setError('')
-    setSuccess('')
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
     try {
-      const result = await shareTrip(tripId, emails)
-      setSuccess(result.message)
-      setEmails([])
-      onUpdate()
-      
+      const result = await shareTrip(tripId, emails);
+      setSuccess(result.message);
+      setEmails([]);
+      onUpdate();
+
       // Close dialog after 2 seconds
       setTimeout(() => {
-        setSuccess('')
-        onClose()
-      }, 2000)
+        setSuccess('');
+        onClose();
+      }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to share trip')
+      setError(err.response?.data?.error || 'Failed to share trip');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleRevoke = async (userId: string, userName: string) => {
-    if (!confirm(`Remove access for ${userName}?`)) return
+    if (!confirm(`Remove access for ${userName}?`)) return;
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
 
     try {
-      await revokeAccess(tripId, userId)
-      setSuccess('Access revoked successfully')
-      onUpdate()
-      
+      await revokeAccess(tripId, userId);
+      setSuccess('Access revoked successfully');
+      onUpdate();
+
       setTimeout(() => {
-        setSuccess('')
-      }, 2000)
+        setSuccess('');
+      }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to revoke access')
+      setError(err.response?.data?.error || 'Failed to revoke access');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddEmail()
+      e.preventDefault();
+      handleAddEmail();
     }
-  }
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -145,7 +149,7 @@ export default function ShareTripDialog({
           </IconButton>
         </Box>
       </DialogTitle>
-      
+
       <DialogContent dividers>
         <Typography variant="subtitle2" gutterBottom>
           Trip: <strong>{tripName}</strong>
@@ -177,15 +181,15 @@ export default function ShareTripDialog({
               onKeyPress={handleKeyPress}
               disabled={loading}
             />
-            <Button 
-              variant="contained" 
+            <Button
+              variant="contained"
               onClick={handleAddEmail}
               disabled={loading || !email.trim()}
             >
               Add
             </Button>
           </Box>
-          
+
           {emails.length > 0 && (
             <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {emails.map((e) => (
@@ -215,7 +219,11 @@ export default function ShareTripDialog({
                     secondary={
                       <>
                         {user.email}
-                        <Typography variant="caption" display="block" color="text.secondary">
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          color="text.secondary"
+                        >
                           Shared {new Date(user.sharedAt).toLocaleDateString()}
                         </Typography>
                       </>
@@ -224,7 +232,9 @@ export default function ShareTripDialog({
                   <ListItemSecondaryAction>
                     <IconButton
                       edge="end"
-                      onClick={() => handleRevoke(user.userId, user.name || user.email)}
+                      onClick={() =>
+                        handleRevoke(user.userId, user.name || user.email)
+                      }
                       disabled={loading}
                       color="error"
                       size="small"
@@ -239,7 +249,11 @@ export default function ShareTripDialog({
         )}
 
         {sharedWith.length === 0 && (
-          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontStyle: 'italic' }}
+          >
             No one has access yet. Add emails above to share this trip.
           </Typography>
         )}
@@ -250,16 +264,17 @@ export default function ShareTripDialog({
           Close
         </Button>
         {emails.length > 0 && (
-          <Button 
-            onClick={handleShare} 
+          <Button
+            onClick={handleShare}
             variant="contained"
             disabled={loading}
             startIcon={loading ? <CircularProgress size={16} /> : <ShareIcon />}
           >
-            Share with {emails.length} {emails.length === 1 ? 'person' : 'people'}
+            Share with {emails.length}{' '}
+            {emails.length === 1 ? 'person' : 'people'}
           </Button>
         )}
       </DialogActions>
     </Dialog>
-  )
+  );
 }
