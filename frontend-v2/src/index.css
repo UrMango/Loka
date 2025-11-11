@@ -3,3 +3,49 @@
 @tailwind utilities;
 
 /* Avoid global SVG rules */
+
+:root {
+	--color-black: #001a16;
+	--color-white: #f1fffd;
+	--color-primary: #009d85;
+	--color-bg: var(--color-white);
+}
+
+/* App background and default text color */
+html,
+body,
+#root {
+	background-color: var(--color-bg);
+	color: var(--color-black);
+}
+
+/* Default button style: bg primary, text white as requested */
+button,
+.btn {
+	background-color: var(--color-primary);
+	color: var(--color-white);
+	border: none;
+	border-radius: 0.5rem;
+	padding: 0.5rem 1rem;
+}
+
+/* Utility text classes to follow your rules:
+	 - .text-important: use primary color (intended for use on white background)
+	 - .text-default: default body text color (black)
+	 - .text-on-primary: text to place on primary backgrounds (white)
+*/
+.text-important {
+	color: var(--color-primary);
+}
+.text-default {
+	color: var(--color-black);
+}
+.text-on-primary {
+	color: var(--color-white);
+}
+
+/* helper: primary background block */
+.bg-primary {
+	background-color: var(--color-primary);
+	color: var(--color-white);
+}

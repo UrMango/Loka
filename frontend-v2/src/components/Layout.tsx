@@ -25,7 +25,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 	return (
 		<Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-			<AppBar position="static" elevation={1} sx={{ bgcolor: 'white', color: 'text.primary' }}>
+			<AppBar position="static" elevation={1} sx={{ bgcolor: 'common.white', color: 'text.primary' }}>
 				<Toolbar>
 					<Flight sx={{ mr: 1, color: 'primary.main' }} />
 					<Typography
