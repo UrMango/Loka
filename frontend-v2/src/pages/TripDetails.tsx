@@ -9,6 +9,7 @@ import {
   deleteRideFromTrip,
   deleteAttractionFromTrip,
   updateTrip,
+  updateUserChecklist,
   addFlightToTrip,
   addHotelToTrip,
   addRideToTrip,
@@ -19,9 +20,10 @@ import {
   placeDetails,
   calculateSmartCheckoutTime,
 } from '../services/api';
-import type { Trip, ChecklistCategory } from '../types/domain';
+import type { Trip, ChecklistCategory, UserChecklist } from '../types/domain';
 import { groupTripByDay } from '../types/domain';
 import TripChecklist from '../components/TripChecklist';
+import { useAuth } from '../context/AuthContext';
 import {
   AddFlightForm,
   AddHotelForm,
@@ -333,6 +335,7 @@ function TripMapView({ trip }: { trip: Trip }) {
 export default function TripDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterCategory>('all');
@@ -416,6 +419,13 @@ export default function TripDetails() {
         .catch((e) => setError(e.message));
   }, [id]);
 
+  // Redirect shared users from list view to timeline
+  useEffect(() => {
+    if (!isOwner && viewMode === 'list') {
+      setViewMode('timeline');
+    }
+  }, [isOwner, viewMode]);
+
   // Calculate smart checkout times when trip loads or changes
   useEffect(() => {
     if (!trip) return;
@@ -487,10 +497,12 @@ export default function TripDetails() {
   const handleChecklistUpdate = async (
     updatedChecklist: ChecklistCategory[]
   ) => {
-    if (!id) return;
+    if (!id || !user) return;
 
     try {
-      const updated = await updateTrip(id, { checklist: updatedChecklist });
+      // Use the new user-specific checklist endpoint
+      // This works for both owners and shared users
+      const updated = await updateUserChecklist(id, updatedChecklist);
       setTrip(updated);
       setError(null);
     } catch (e: any) {
@@ -1037,24 +1049,27 @@ export default function TripDetails() {
             sx={{ border: '1px solid', borderColor: 'divider' }}
           >
             <Stack direction="row">
-              <Button
-                size="small"
-                startIcon={<ViewList />}
-                onClick={() => setViewMode('list')}
-                sx={{
-                  borderRadius: 0,
-                  borderRight: '1px solid',
-                  borderColor: 'divider',
-                  bgcolor: viewMode === 'list' ? 'primary.main' : 'transparent',
-                  color: viewMode === 'list' ? 'white' : 'text.primary',
-                  '&:hover': {
+              {isOwner && (
+                <Button
+                  size="small"
+                  startIcon={<ViewList />}
+                  onClick={() => setViewMode('list')}
+                  sx={{
+                    borderRadius: 0,
+                    borderRight: '1px solid',
+                    borderColor: 'divider',
                     bgcolor:
-                      viewMode === 'list' ? 'primary.dark' : 'action.hover',
-                  },
-                }}
-              >
-                List
-              </Button>
+                      viewMode === 'list' ? 'primary.main' : 'transparent',
+                    color: viewMode === 'list' ? 'white' : 'text.primary',
+                    '&:hover': {
+                      bgcolor:
+                        viewMode === 'list' ? 'primary.dark' : 'action.hover',
+                    },
+                  }}
+                >
+                  List
+                </Button>
+              )}
               <Button
                 size="small"
                 startIcon={<TimelineIcon />}
@@ -4249,7 +4264,12 @@ export default function TripDetails() {
       {viewMode === 'checklist' && (
         <Box sx={{ mt: 2 }}>
           <TripChecklist
-            checklist={trip.checklist || []}
+            checklist={
+              user
+                ? trip.userChecklists?.find((uc) => uc.userId === user.id)
+                    ?.checklist || []
+                : trip.checklist || []
+            }
             onUpdate={handleChecklistUpdate}
           />
         </Box>

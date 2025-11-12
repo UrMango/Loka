@@ -26,6 +26,7 @@ import type { ChecklistCategory, ChecklistItem } from '../types/domain';
 interface TripChecklistProps {
   checklist: ChecklistCategory[];
   onUpdate: (checklist: ChecklistCategory[]) => void;
+  readOnly?: boolean;
 }
 
 const DEFAULT_CHECKLIST: ChecklistCategory[] = [
@@ -171,6 +172,7 @@ const DEFAULT_CHECKLIST: ChecklistCategory[] = [
 export default function TripChecklist({
   checklist,
   onUpdate,
+  readOnly = false,
 }: TripChecklistProps) {
   const [newItemText, setNewItemText] = useState<Record<string, string>>({});
   const [expandedCategories, setExpandedCategories] = useState<string[]>([
@@ -382,6 +384,7 @@ export default function TripChecklist({
                             handleToggleItem(category.id, item.id)
                           }
                           size="small"
+                          disabled={readOnly}
                         />
                         <Typography
                           variant="body2"
@@ -397,7 +400,7 @@ export default function TripChecklist({
                         >
                           {item.label}
                         </Typography>
-                        {item.isCustom && (
+                        {item.isCustom && !readOnly && (
                           <IconButton
                             className="delete-btn"
                             size="small"
@@ -411,35 +414,36 @@ export default function TripChecklist({
                         )}
                       </Stack>
                     ))}
-
                     {/* Add Custom Item */}
-                    <Stack direction="row" spacing={1} mt={1}>
-                      <TextField
-                        size="small"
-                        placeholder="Add custom item..."
-                        value={newItemText[category.id] || ''}
-                        onChange={(e) =>
-                          setNewItemText({
-                            ...newItemText,
-                            [category.id]: e.target.value,
-                          })
-                        }
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleAddItem(category.id);
+                    {!readOnly && (
+                      <Stack direction="row" spacing={1} mt={1}>
+                        <TextField
+                          size="small"
+                          placeholder="Add custom item..."
+                          value={newItemText[category.id] || ''}
+                          onChange={(e) =>
+                            setNewItemText({
+                              ...newItemText,
+                              [category.id]: e.target.value,
+                            })
                           }
-                        }}
-                        fullWidth
-                      />
-                      <Button
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => handleAddItem(category.id)}
-                        disabled={!newItemText[category.id]?.trim()}
-                      >
-                        Add
-                      </Button>
-                    </Stack>
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              handleAddItem(category.id);
+                            }
+                          }}
+                          fullWidth
+                        />
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={() => handleAddItem(category.id)}
+                          disabled={!newItemText[category.id]?.trim()}
+                        >
+                          Add
+                        </Button>
+                      </Stack>
+                    )}{' '}
                   </Stack>
                 </AccordionDetails>
               </Accordion>

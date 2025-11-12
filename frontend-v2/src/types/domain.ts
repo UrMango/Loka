@@ -113,6 +113,11 @@ export interface ChecklistCategory {
   items: ChecklistItem[];
 }
 
+export interface UserChecklist {
+  userId: string;
+  checklist: ChecklistCategory[];
+}
+
 export interface Trip {
   id: string;
   name: string;
@@ -123,7 +128,8 @@ export interface Trip {
   hotels: HotelBooking[];
   rides: RideLeg[];
   attractions: AttractionVisit[];
-  checklist?: ChecklistCategory[];
+  checklist?: ChecklistCategory[]; // Legacy: owner's checklist (kept for backward compatibility)
+  userChecklists?: UserChecklist[]; // New: per-user checklists for shared trips
   createdAt?: string;
   updatedAt?: string;
   userId?: string;
