@@ -957,7 +957,7 @@ export default function TripDetails() {
           </Stack>
         </Stack>
 
-        <Typography variant="h3" fontWeight={700} gutterBottom>
+        <Typography variant="h3" fontWeight={900} gutterBottom>
           {trip.name}
         </Typography>
 

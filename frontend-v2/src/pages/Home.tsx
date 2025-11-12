@@ -82,7 +82,7 @@ export default function Home() {
           <Container maxWidth="lg">
             <Stack spacing={3} alignItems="center" textAlign="center">
               <TravelExplore sx={{ fontSize: 64, opacity: 0.9 }} />
-              <Typography variant="h3" component="h1" fontWeight={700}>
+              <Typography variant="h3" component="h1" fontWeight={900}>
                 Plan Your Perfect Trip
               </Typography>
               <Typography variant="h6" sx={{ opacity: 0.95, maxWidth: 600 }}>
@@ -101,7 +101,7 @@ export default function Home() {
                   px: 4,
                   py: 1.5,
                   fontSize: '1.1rem',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   '&:hover': {
                     bgcolor: 'grey.100',
                     transform: 'translateY(-2px)',
@@ -132,7 +132,7 @@ export default function Home() {
         alignItems="center"
         mb={3}
       >
-        <Typography variant="h5" component="h2" fontWeight={600}>
+        <Typography variant="h5" component="h2" fontWeight={700}>
           My Trips {trips && `(${ownedTrips.length})`}
         </Typography>
         <Button
@@ -241,7 +241,7 @@ export default function Home() {
                   sx={{ height: '100%' }}
                 >
                   <CardContent sx={{ p: 3 }}>
-                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                    <Typography variant="h6" fontWeight={700} gutterBottom>
                       {t.name || 'Untitled Trip'}
                     </Typography>
 
