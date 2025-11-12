@@ -19,8 +19,9 @@ import {
   placeDetails,
   calculateSmartCheckoutTime,
 } from '../services/api';
-import type { Trip } from '../types/domain';
+import type { Trip, ChecklistCategory } from '../types/domain';
 import { groupTripByDay } from '../types/domain';
+import TripChecklist from '../components/TripChecklist';
 import {
   AddFlightForm,
   AddHotelForm,
@@ -93,6 +94,7 @@ import {
   Share as ShareIcon,
   Visibility as VisibilityIcon,
   BarChart as GanttIcon,
+  ChecklistRtl as ChecklistIcon,
 } from '@mui/icons-material';
 
 // Helper function to get attraction type label
@@ -122,7 +124,7 @@ import ShareTripDialog from '../components/ShareTripDialog';
 import { format, parseISO } from 'date-fns';
 
 type FilterCategory = 'all' | 'flights' | 'hotels' | 'rides' | 'attractions';
-type ViewMode = 'list' | 'timeline' | 'map' | 'gantt';
+type ViewMode = 'list' | 'timeline' | 'map' | 'gantt' | 'checklist';
 
 // Small embedded map component for ride routes
 function RideMapEmbed({ ride }: { ride: any }) {
@@ -479,6 +481,20 @@ export default function TripDetails() {
       } catch (e: any) {
         setError(e.message);
       }
+    }
+  };
+
+  const handleChecklistUpdate = async (
+    updatedChecklist: ChecklistCategory[]
+  ) => {
+    if (!id) return;
+
+    try {
+      const updated = await updateTrip(id, { checklist: updatedChecklist });
+      setTrip(updated);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
     }
   };
 
@@ -1082,6 +1098,8 @@ export default function TripDetails() {
                 onClick={() => setViewMode('gantt')}
                 sx={{
                   borderRadius: 0,
+                  borderRight: '1px solid',
+                  borderColor: 'divider',
                   bgcolor:
                     viewMode === 'gantt' ? 'primary.main' : 'transparent',
                   color: viewMode === 'gantt' ? 'white' : 'text.primary',
@@ -1092,6 +1110,25 @@ export default function TripDetails() {
                 }}
               >
                 Gantt
+              </Button>
+              <Button
+                size="small"
+                startIcon={<ChecklistIcon />}
+                onClick={() => setViewMode('checklist')}
+                sx={{
+                  borderRadius: 0,
+                  bgcolor:
+                    viewMode === 'checklist' ? 'primary.main' : 'transparent',
+                  color: viewMode === 'checklist' ? 'white' : 'text.primary',
+                  '&:hover': {
+                    bgcolor:
+                      viewMode === 'checklist'
+                        ? 'primary.dark'
+                        : 'action.hover',
+                  },
+                }}
+              >
+                Checklist
               </Button>
             </Stack>
           </Paper>
@@ -3556,12 +3593,16 @@ export default function TripDetails() {
                   itemEndDate?: string,
                   itemEndTime?: string
                 ) => {
+                  if (!itemStartDate || !itemStartTime) {
+                    return { left: 0, width: 2 };
+                  }
+
                   const tripStart = new Date(trip.startDate).getTime();
                   const tripDuration =
                     new Date(trip.endDate).getTime() - tripStart + 86400000; // +1 day in ms
 
                   // Parse start
-                  const [startHour, startMin] = itemStartTime
+                  const [startHour = 0, startMin = 0] = itemStartTime
                     .split(':')
                     .map(Number);
                   const startDateTime =
@@ -3575,7 +3616,7 @@ export default function TripDetails() {
                   // Parse end
                   let widthPercent = 2; // Minimum width for point events
                   if (itemEndDate && itemEndTime) {
-                    const [endHour, endMin] = itemEndTime
+                    const [endHour = 0, endMin = 0] = itemEndTime
                       .split(':')
                       .map(Number);
                     const endDateTime =
@@ -3592,18 +3633,22 @@ export default function TripDetails() {
                 };
 
                 // Collect all items by category
-                const flights = trip.flights.map((f) => ({
-                  ...f,
-                  startDate:
-                    f.departureDateTime.split('T')[0] ||
-                    f.departureDateTime.split(' ')[0],
-                  startTime: extractTime(f.departureDateTime),
-                  endDate:
-                    f.arrivalDateTime.split('T')[0] ||
-                    f.arrivalDateTime.split(' ')[0],
-                  endTime: extractTime(f.arrivalDateTime),
-                  label: `${f.airline || ''} ${f.flightNumber || ''} | ${f.departureAirportCode} → ${f.arrivalAirportCode}`,
-                }));
+                const flights = trip.flights.map((f) => {
+                  const depDateTime = f.departureDateTime || '';
+                  const arrDateTime = f.arrivalDateTime || '';
+                  return {
+                    ...f,
+                    startDate: depDateTime.includes('T')
+                      ? depDateTime.split('T')[0]
+                      : depDateTime.split(' ')[0],
+                    startTime: extractTime(depDateTime),
+                    endDate: arrDateTime.includes('T')
+                      ? arrDateTime.split('T')[0]
+                      : arrDateTime.split(' ')[0],
+                    endTime: extractTime(arrDateTime),
+                    label: `${f.airline || ''} ${f.flightNumber || ''} | ${f.departureAirportCode} → ${f.arrivalAirportCode}`,
+                  };
+                });
 
                 const hotels = trip.hotels.map((h) => ({
                   ...h,
@@ -3727,7 +3772,7 @@ export default function TripDetails() {
                             sx={{ color: '#1976d2' }}
                           />
                           <Typography variant="subtitle2" fontWeight={600}>
-                            ✈️ Flights
+                            Flights
                           </Typography>
                         </Stack>
                       </Box>
@@ -3852,7 +3897,7 @@ export default function TripDetails() {
                             sx={{ color: '#9c27b0' }}
                           />
                           <Typography variant="subtitle2" fontWeight={600}>
-                            🏨 Hotels
+                            Hotels
                           </Typography>
                         </Stack>
                       </Box>
@@ -3974,7 +4019,7 @@ export default function TripDetails() {
                             sx={{ color: '#0288d1' }}
                           />
                           <Typography variant="subtitle2" fontWeight={600}>
-                            🚗 Rides
+                            Rides
                           </Typography>
                         </Stack>
                       </Box>
@@ -4096,7 +4141,7 @@ export default function TripDetails() {
                             sx={{ color: '#2e7d32' }}
                           />
                           <Typography variant="subtitle2" fontWeight={600}>
-                            🎟️ Activities
+                            Activities
                           </Typography>
                         </Stack>
                       </Box>
@@ -4197,6 +4242,16 @@ export default function TripDetails() {
               })()}
             </Box>
           </Card>
+        </Box>
+      )}
+
+      {/* Checklist View */}
+      {viewMode === 'checklist' && (
+        <Box sx={{ mt: 2 }}>
+          <TripChecklist
+            checklist={trip.checklist || []}
+            onUpdate={handleChecklistUpdate}
+          />
         </Box>
       )}
 

@@ -100,6 +100,19 @@ export interface SharedUser {
   sharedAt: string;
 }
 
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  checked: boolean;
+  isCustom?: boolean;
+}
+
+export interface ChecklistCategory {
+  id: string;
+  name: string;
+  items: ChecklistItem[];
+}
+
 export interface Trip {
   id: string;
   name: string;
@@ -110,6 +123,7 @@ export interface Trip {
   hotels: HotelBooking[];
   rides: RideLeg[];
   attractions: AttractionVisit[];
+  checklist?: ChecklistCategory[];
   createdAt?: string;
   updatedAt?: string;
   userId?: string;
