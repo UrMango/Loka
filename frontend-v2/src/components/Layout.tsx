@@ -83,7 +83,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 '&.active': {
                   color: 'primary.main',
                   bgcolor: 'primary.50',
-                  fontWeight: 600,
+                  fontWeight: 700,
                 },
               })}
             >

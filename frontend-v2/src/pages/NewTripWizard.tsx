@@ -140,7 +140,11 @@ export default function NewTripWizard() {
         <Typography variant="h4" fontWeight={700}>
           Create New Trip
         </Typography>
-        <Typography variant="body1" sx={{ mt: 1, opacity: 0.9 }}>
+        <Typography
+          fontWeight={900}
+          variant="body1"
+          sx={{ mt: 1, opacity: 0.9 }}
+        >
           Plan your perfect journey in just a few steps
         </Typography>
       </Paper>
