@@ -78,7 +78,12 @@ export default function Login() {
               <Typography variant="h4" gutterBottom fontWeight="bold">
                 MeetLoka
               </Typography>
-              <Typography variant="body1" color="text.secondary" gutterBottom>
+              <Typography
+                fontWeight={900}
+                variant="body1"
+                color="text.secondary"
+                gutterBottom
+              >
                 Plan your perfect trip
               </Typography>
             </Box>
