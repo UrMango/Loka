@@ -39,7 +39,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Cloud background sits behind the whole layout. You can tweak count/opacity here. */}
-      <CloudsBackground count={50} />
+      <CloudsBackground count={200} />
       <AppBar
         position="static"
         elevation={1}
