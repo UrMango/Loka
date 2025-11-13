@@ -221,7 +221,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         component="main"
         sx={{
           flexGrow: 1,
-          py: { xs: 2, md: 4 },
+          py: { xs: 0, md: 4 },
           display: 'flex',
           flexDirection: 'column',
           px: { xs: 2, sm: 3, md: 4 },
